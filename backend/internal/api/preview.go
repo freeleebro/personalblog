@@ -57,6 +57,9 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	query := r.URL.Query()
 
+	// 预览的所有响应（含 404/410）都不该被任何中间层缓存。
+	w.Header().Set("Cache-Control", "no-store")
+
 	exp, err := strconv.ParseInt(strings.TrimSpace(query.Get("exp")), 10, 64)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "preview_not_found", "预览链接无效")
@@ -84,8 +87,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 预览内容不进搜索引擎，也不让中间层缓存。
-	w.Header().Set("Cache-Control", "no-store")
+	// 预览内容不进搜索引擎；no-store 已在函数开头统一设好。
 	w.Header().Set("X-Robots-Tag", "noindex, nofollow")
 	writeData(w, post, nil)
 }
