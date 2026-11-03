@@ -1205,7 +1205,7 @@ function BackupPanel() {
         解压后可以直接用编辑器「导入 Markdown 文件」逐篇导回。
       </p>
 
-      <button className="btn" onClick={exportAll} disabled={busy}>
+      <button className="btn btn--ghost" onClick={exportAll} disabled={busy}>
         {busy ? '正在打包…' : '导出全部内容（zip）'}
       </button>
       {msg ? <p className="admin-notice">{msg}</p> : null}
@@ -1287,7 +1287,7 @@ function PasswordPanel() {
       </label>
 
       <button
-        className="btn"
+        className="btn btn--ghost"
         onClick={submit}
         disabled={busy || !current || !next || !confirm}
       >
