@@ -86,7 +86,7 @@ docker compose down -v          # 停止并删除数据卷（彻底重置）
 本机改完代码后，在仓库根目录跑一条命令：
 
 ```powershell
-pwsh scripts/release.ps1 -SshHost leebro
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release.ps1 -SshHost leebro
 ```
 
 它负责打包（排除 `node_modules`、`.next`、`.env*`、本地数据库等）、上传，然后在服务器上执行
