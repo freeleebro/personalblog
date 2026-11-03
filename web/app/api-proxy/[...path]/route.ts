@@ -43,7 +43,7 @@ async function proxy(request: Request, params: { path: string[] }) {
     const res = await fetch(target, {
       method: request.method,
       headers: {
-        Accept: 'application/json',
+        Accept: request.headers.get('accept') ?? 'application/json',
         'Content-Type': request.headers.get('content-type') ?? 'application/json',
         Authorization: request.headers.get('authorization') ?? '',
       },
@@ -51,18 +51,25 @@ async function proxy(request: Request, params: { path: string[] }) {
       cache: 'no-store',
     });
 
-    const body = await res.text();
-    const responseInit: ResponseInit = {
-      status: res.status,
-      headers: {
-        'Content-Type': res.headers.get('content-type') ?? 'application/json',
-      },
+    // 响应体同样必须按字节转发：res.text() 会按 UTF-8 解码，zip / 图片之类
+    // 的二进制会被替换成 U+FFFD（导出功能一开始就是这么坏掉的）。
+    const body = await res.arrayBuffer();
+    const headers: Record<string, string> = {
+      'Content-Type': res.headers.get('content-type') ?? 'application/json',
     };
-    // 写接口不缓存
+    // 导出的 zip 靠这个头告诉浏览器存成什么文件名
+    const disposition = res.headers.get('content-disposition');
+    if (disposition) headers['Content-Disposition'] = disposition;
+
+    const upstreamCache = res.headers.get('cache-control');
     if (request.method !== 'GET') {
-      responseInit.headers = { ...responseInit.headers, 'Cache-Control': 'no-store' };
+      // 写接口不缓存
+      headers['Cache-Control'] = 'no-store';
+    } else if (upstreamCache) {
+      headers['Cache-Control'] = upstreamCache;
     }
-    return new NextResponse(body || undefined, responseInit);
+
+    return new NextResponse(body.byteLength > 0 ? body : null, { status: res.status, headers });
   } catch {
     return NextResponse.json(
       { error: { code: 'upstream_unreachable', message: '无法连接后端服务' } },
