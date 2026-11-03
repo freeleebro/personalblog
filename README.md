@@ -121,6 +121,11 @@ docker run --rm --entrypoint tar -v beichuang_beichuang-media:/dst \
 > 备份默认落在同一块盘上，防的是「误删 / 升级搞坏」，防不了「整台机器没了」。
 > 真在意就把 `/var/backups/beichuang` 用 rsync 或 rclone 同步到别处，一行定时任务的事。
 
+内容层面还有一层出口：后台「站点设置 → 导出全部内容」会生成一个 zip，里面每篇文章是带
+front matter 的 `.md`、独立页面单独一个文件、上传过的图片在 `media/` 下、外加 `posts.json`。
+换服务器或者哪天不想用这套系统了，直接拿这个 zip 走人；解压后也能用编辑器的
+「导入 Markdown 文件」逐篇导回去。
+
 > 反代与服务在同一台机器时，`5000` 端口只绑在 `127.0.0.1`；如需换端口，改 `docker-compose.yml` 里 `ports` 的 `published` 部分。
 
 ---
@@ -293,6 +298,7 @@ personal-blog/
 | DELETE | `/api/v1/admin/posts/{slug}` | 删除文章 |
 | POST | `/api/v1/admin/uploads` | 上传配图（multipart，字段名 `file`），返回 `/media/...` |
 | GET | `/api/v1/admin/preview/{slug}` | 生成 1 小时有效的草稿预览链接 |
+| GET | `/api/v1/admin/export` | 导出全部内容为 zip（文章 `.md` + 页面 + 图片 + `posts.json`） |
 | POST/PUT | `/api/v1/admin/tags` / `.../{slug}` | 创建/更新标签 |
 | DELETE | `/api/v1/admin/tags/{slug}` | 删除标签 |
 | POST | `/api/v1/admin/pages` | 创建/更新独立页面 |

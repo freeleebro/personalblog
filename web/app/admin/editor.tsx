@@ -1160,8 +1160,56 @@ function SettingsPanel() {
 
       <button className="btn btn--primary" onClick={save} disabled={!loaded}>保存设置</button>
 
+      <BackupPanel />
+
       <PasswordPanel />
     </div>
+  );
+}
+
+/**
+ * 内容导出：一键把文章、页面、图片打包成 zip。
+ * 不想用这套系统了，或者只是想留个本地备份，都能直接拿走。
+ */
+function BackupPanel() {
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function exportAll() {
+    setBusy(true);
+    setMsg('');
+    try {
+      const { blob, filename } = await adminApi.exportContent();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // 给浏览器一点时间把 blob 交给下载器，再释放
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      setMsg(`已导出 ${filename}（${Math.max(1, Math.round(blob.size / 1024))} KB）`);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '导出失败');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="admin-password">
+      <h3 className="admin-section-title">导出全部内容</h3>
+      <p className="admin-hint">
+        打包成 zip：每篇文章一个带 front matter 的 .md、独立页面、上传过的图片，外加 posts.json。
+        解压后可以直接用编辑器「导入 Markdown 文件」逐篇导回。
+      </p>
+
+      <button className="btn" onClick={exportAll} disabled={busy}>
+        {busy ? '正在打包…' : '导出全部内容（zip）'}
+      </button>
+      {msg ? <p className="admin-notice">{msg}</p> : null}
+    </section>
   );
 }
 

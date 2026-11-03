@@ -151,6 +151,38 @@ export const adminApi = {
     return (body as { data: { url: string; width: number; height: number; size: number } }).data;
   },
 
+  /**
+   * 导出全部内容为 zip（文章、页面、媒体、posts.json）。
+   * 二进制响应不能走 adminRequest（它会 res.json()），这里单独处理。
+   */
+  exportContent: async () => {
+    let res: Response;
+    try {
+      res = await fetch(`${ADMIN_BASE}/api/v1/admin/export`, {
+        headers: {
+          Accept: 'application/zip',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+    } catch {
+      throw new AdminError(`无法连接后端（${ADMIN_BASE}）`, 503);
+    }
+
+    if (res.status === 401) throw new AdminError('登录已过期，请重新登录', 401);
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      const msg = (body as { error?: { message?: string } })?.error?.message ?? `导出失败（${res.status}）`;
+      throw new AdminError(msg, res.status);
+    }
+
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    return {
+      blob: await res.blob(),
+      filename: match?.[1] ?? 'blog-export.zip',
+    };
+  },
+
   listTags: () => adminRequest<Tag[]>('/tags'),
   saveTag: (tag: { slug: string; name: string; color: string; description: string }) =>
     adminRequest<{ id: number; slug: string }>('/admin/tags', {

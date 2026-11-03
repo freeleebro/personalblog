@@ -77,6 +77,7 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("POST /api/v1/admin/uploads", auth(s.handleAdminUpload))
 	mux.HandleFunc("GET /api/v1/admin/preview/{slug}", auth(s.handleAdminPreviewLink))
+	mux.HandleFunc("GET /api/v1/admin/export", auth(s.handleAdminExport))
 
 	mux.HandleFunc("POST /api/v1/admin/tags", auth(s.handleAdminSaveTag))
 	mux.HandleFunc("PUT /api/v1/admin/tags/{slug}", auth(s.handleAdminSaveTag))
