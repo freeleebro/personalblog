@@ -1,0 +1,25 @@
+# air 热重载配置：本地开发时监听 Go 代码变化，自动重编译并重启后端。
+# 用法（在 backend 目录）：air
+# 或：air -c .air.toml
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  # 只编译不运行，air 负责重启进程
+  cmd = "go build -o tmp/server.exe ./cmd/server"
+  bin = "tmp/server.exe"
+  # 监听 Go 与 SQL 变化
+  include_ext = ["go", "sql"]
+  exclude_dir = ["tmp", "vendor", ".git", "node_modules"]
+  # 延迟重启，避免连续保存时反复编译
+  delay = 800
+  stop_on_error = true
+  # 把日志输出到终端
+  full_bin = ""
+
+[log]
+  time = true
+
+[misc]
+  clean_on_exit = true

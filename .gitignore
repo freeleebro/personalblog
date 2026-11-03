@@ -1,0 +1,49 @@
+# 环境变量与密钥（绝不能入库）
+.env
+.env.local
+.env.*.local
+.env.server
+.env.server.bak-*
+.env.server.*
+!.env.server.example
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Go
+backend/out/
+backend/server
+backend/tmp/
+backend/data/
+*.exe
+*.test
+
+# 本地便携数据库与缓存（scripts/ 会下载到这里）
+.devdb/
+.cache/
+
+# 本地备份产物
+*.sql.gz
+*.tar.gz
+
+# 本地 AI / 编辑器工具目录（不属于项目源码）
+.agents/
+.workbuddy/
+.taste-skill/
+
+# 编辑器与系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
+
+# 本地运维/部署笔记（含内部信息，不随仓库发布）
+docs/OPTIMIZATION-PLAN.md
+
+skills-lock.json
+

@@ -1,0 +1,14 @@
+.git
+.devdb
+.workbuddy
+.taste-skill
+.agents
+web/node_modules
+web/.next
+web/tsconfig.tsbuildinfo
+backend/tmp
+backend/server.exe
+*.log
+.env
+.env.*
+!.env.server.example

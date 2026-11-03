@@ -1,0 +1,75 @@
+# ============================================================
+# 生产部署：一个容器跑 PostgreSQL + Go API + Next.js，
+# 前面加一个 Caddy 负责 TLS、压缩与静态资源长缓存。
+#
+# 对外端口只有 Caddy 的 80/443。应用容器只绑 127.0.0.1:5000，
+# 方便在服务器上直接 curl 调试，外网访问不到。
+# ============================================================
+name: beichuang
+
+services:
+  beichuang:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: beichuang
+    restart: unless-stopped
+    env_file:
+      - .env.server
+    environment:
+      APP_ENV: production
+      APP_ADDR: ':8080'
+      AUTO_MIGRATE: 'true'
+      API_BASE_URL: http://127.0.0.1:8080
+      PORT: '3000'
+      HOSTNAME: 0.0.0.0
+      PGDATA: /var/lib/postgresql/data
+      UPLOAD_DIR: /data/uploads
+    ports:
+      # 仅本机可访问，用于排障；公网入口是 caddy
+      - '127.0.0.1:5000:3000'
+    volumes:
+      - beichuang-data:/var/lib/postgresql/data
+      # 文章配图：独立数据卷，重建镜像不会丢
+      - beichuang-media:/data/uploads
+    healthcheck:
+      # 打 Go 的 /api/v1/health（不查库、不经过 SSR），
+      # 不要用 / ——那会每 30 秒触发一次完整页面渲染。
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8080/api/v1/health >/dev/null || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: beichuang-caddy
+    restart: unless-stopped
+    env_file:
+      - .env.server
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - beichuang
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'
+
+volumes:
+  beichuang-data:
+  beichuang-media:
+  caddy-data:
+  caddy-config:

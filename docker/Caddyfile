@@ -1,0 +1,49 @@
+# Caddy 反向代理配置
+#
+# 站点地址取环境变量 BLOG_DOMAIN：
+#   - 填了域名            → 自动申请并续期 Lets Encrypt 证书，全站 HTTPS
+#   - 不填且删掉这一行    → 纯 HTTP，按 IP 访问，适合先跑通再上域名
+#
+# 注意 1：BLOG_DOMAIN 不能写成空值（BLOG_DOMAIN= ）。Caddy 的 {$VAR:默认值}
+#   只在变量「不存在」时才用默认值，空字符串会让站点地址变成空，整个 Caddyfile
+#   会被当成全局配置块，报 unrecognized global option。
+# 注意 2：Next 对 public/ 下的静态文件固定返回 Cache-Control: public, max-age=0，
+#   靠 next.config 改不动；而 Caddy 的 header 只是在自己的响应头里加一条，
+#   上游那条会跟着写下来变成两个 Cache-Control（max-age=0 生效，等于没缓存）。
+#   所以这里先用 handle 把两类路径分开，再在 reverse_proxy 里
+#   header_down -Cache-Control 把上游那条删掉，只留下我们设的。
+
+{$BLOG_DOMAIN::80} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+		-Server
+	}
+
+	# 内容永不变化的资源（文件名带 hash 或宽度）→ 一年强缓存
+	@immutable path /_next/static/* /anime-* /icon.svg /favicon* /media/*
+	handle @immutable {
+		header Cache-Control "public, max-age=31536000, immutable"
+		reverse_proxy beichuang:3000 {
+			header_down -Cache-Control
+		}
+	}
+
+	# 接口与后台不允许任何中间层缓存
+	@dynamic path /api/* /api-proxy/* /admin*
+	handle @dynamic {
+		header Cache-Control "no-store"
+		reverse_proxy beichuang:3000 {
+			header_down -Cache-Control
+		}
+	}
+
+	# 其余是 SSR 页面：保留 Next 自己那套 private/no-store
+	handle {
+		reverse_proxy beichuang:3000
+	}
+}

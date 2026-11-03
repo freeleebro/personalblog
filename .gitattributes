@@ -1,0 +1,12 @@
+# 统一换行符：仓库里一律存 LF，Windows 检出也不转成 CRLF
+# （docker/entrypoint.sh 若带 CRLF，容器里会报 "/bin/sh^M: not found"）
+* text=auto eol=lf
+
+# 二进制资源不做换行符转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
