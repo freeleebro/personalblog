@@ -1,0 +1,11 @@
+[Unit]
+Description=Backup blog database and media volume
+Documentation=https://github.com/freeleebro/personalblog
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/beichuang/scripts/backup.sh
+Nice=10
+IOSchedulingClass=idle

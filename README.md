@@ -75,14 +75,45 @@ docker compose down -v          # 停止并删除数据卷（彻底重置）
 
 改端口不要动 `docker-compose.yml`，在 `personal-blog/.env` 里覆盖即可（见下方环境变量）。
 
-备份要同时备份两个卷（数据库 + 上传的图片）：
+备份要同时覆盖两个卷：数据库用 `pg_dump` 逻辑导出（比直接 tar 数据目录安全，还原时不会
+因为数据文件版本或半写状态出问题），图片卷打成 tar.gz。仓库里带了脚本：
 
 ```bash
-docker run --rm -v beichuang_beichuang-data:/data -v "$PWD":/backup alpine \
-  tar czf /backup/db-$(date +%F).tar.gz -C /data .
-docker run --rm -v beichuang_beichuang-media:/data -v "$PWD":/backup alpine \
-  tar czf /backup/media-$(date +%F).tar.gz -C /data .
+sudo /opt/beichuang/scripts/backup.sh        # 手工跑一次，输出在 /var/backups/beichuang
 ```
+
+装成每周自动跑（周日 03:30 北京时间，服务器时区是 UTC 也不影响）：
+
+```bash
+sudo install -m 644 docker/systemd/beichuang-backup.service /etc/systemd/system/
+sudo install -m 644 docker/systemd/beichuang-backup.timer   /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now beichuang-backup.timer
+systemctl list-timers beichuang-backup.timer   # 看下次触发时间
+journalctl -u beichuang-backup.service -n 20   # 看上次跑的结果
+```
+
+默认保留 30 天（一周一次 ≈ 留 4~5 份），可用环境变量覆盖：`BACKUP_DIR`（默认
+`/var/backups/beichuang`）、`RETENTION_DAYS`（默认 `30`）。每次备份都会写一份
+`sha256` 校验和。
+
+还原：
+
+```bash
+# 数据库（dump 带 --clean，会先删同名对象再重建）
+gunzip -c /var/backups/beichuang/beichuang-db-20261103T081456.sql.gz \
+  | docker exec -i beichuang psql -U blog -d beichuang
+
+# 图片卷（先把旧内容清掉再解包，注意别在 -C 上写错路径）
+docker run --rm --entrypoint sh -v beichuang_beichuang-media:/dst beichuang-beichuang \
+  -c 'rm -rf /dst/*'
+docker run --rm --entrypoint tar -v beichuang_beichuang-media:/dst \
+  -v /var/backups/beichuang:/backup beichuang-beichuang \
+  -xzf /backup/beichuang-media-20261103T081456.tar.gz -C /dst
+```
+
+> 备份默认落在同一块盘上，防的是「误删 / 升级搞坏」，防不了「整台机器没了」。
+> 真在意就把 `/var/backups/beichuang` 用 rsync 或 rclone 同步到别处，一行定时任务的事。
 
 > 反代与服务在同一台机器时，`5000` 端口只绑在 `127.0.0.1`；如需换端口，改 `docker-compose.yml` 里 `ports` 的 `published` 部分。
 

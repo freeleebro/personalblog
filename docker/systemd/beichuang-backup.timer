@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly backup of blog data (Sunday 03:30 Asia/Shanghai)
+
+[Timer]
+# 服务器时区是 UTC，这里显式写时区，免得「周日凌晨」跑到北京时间的中午。
+OnCalendar=Sun *-*-* 03:30:00 Asia/Shanghai
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target
