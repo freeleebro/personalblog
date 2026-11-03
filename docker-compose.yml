@@ -33,7 +33,7 @@ services:
       # 文章配图：独立数据卷，重建镜像不会丢
       - beichuang-media:/data/uploads
     healthcheck:
-      # 打 Go 的 /api/v1/health（不查库、不经过 SSR），
+      # 打 Go 的 /api/v1/health（只做一次 DB Ping，不经过 SSR），
       # 不要用 / ——那会每 30 秒触发一次完整页面渲染。
       test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8080/api/v1/health >/dev/null || exit 1']
       interval: 30s
