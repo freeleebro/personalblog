@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	_ "time/tzdata" // 把 IANA 时区库编进二进制，容器里不必装 tzdata
 )
 
 // Config 是进程级配置。
@@ -41,6 +42,10 @@ type Config struct {
 
 	// AuthorSlug 指向 authors 表里默认展示的作者；没配就退化成 "author"。
 	AuthorSlug string
+
+	// SiteLocation 用于生成带日期的 slug（如 post-20261103-ab12cd）等
+	// 「按站点本地时区」计算的时间，默认 Asia/Shanghai。
+	SiteLocation *time.Location
 
 	ReadTimeout     time.Duration
 	WriteTimeout    time.Duration
@@ -79,6 +84,7 @@ func Load() Config {
 		AdminSecret:        getEnv("ADMIN_SECRET", "change-me-in-production"),
 		AdminPasswordReset: getBool("ADMIN_PASSWORD_RESET", false),
 		AuthorSlug:         getEnv("AUTHOR_SLUG", "author"),
+		SiteLocation:       loadLocation(getEnv("SITE_TIMEZONE", "Asia/Shanghai")),
 
 		ReadTimeout:     getDuration("READ_TIMEOUT", 15*time.Second),
 		WriteTimeout:    getDuration("WRITE_TIMEOUT", 30*time.Second),
@@ -96,6 +102,26 @@ func Load() Config {
 
 // IsProduction 用于决定是否输出更严格的日志与错误细节。
 func (c Config) IsProduction() bool { return c.Env == "production" }
+
+// loadLocation 解析 SITE_TIMEZONE。时区数据已通过 time/tzdata 编进二进制，
+// 容器里没装 tzdata 也能用；名字非法时退回 UTC，并保持可用的固定偏移。
+func loadLocation(name string) *time.Location {
+	if loc, err := time.LoadLocation(name); err == nil {
+		return loc
+	}
+	if loc, err := time.LoadLocation("UTC"); err == nil {
+		return loc
+	}
+	return time.UTC
+}
+
+// Location 返回站点时区；Config 是零值时退回 UTC，避免调用方判断 nil。
+func (c Config) Location() *time.Location {
+	if c.SiteLocation == nil {
+		return time.UTC
+	}
+	return c.SiteLocation
+}
 
 func getEnv(key, fallback string) string {
 	if v, ok := os.LookupEnv(key); ok && strings.TrimSpace(v) != "" {

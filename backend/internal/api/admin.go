@@ -230,7 +230,7 @@ func (s *Server) handleAdminSavePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.TrimSpace(in.Slug) == "" {
-		in.Slug = postSlug(in.Title, time.Now())
+		in.Slug = postSlug(in.Title, time.Now().In(s.cfg.Location()))
 	}
 
 	authorID, err := s.defaultAuthorID(r)

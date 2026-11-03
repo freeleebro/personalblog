@@ -109,3 +109,25 @@ func TestIsProduction(t *testing.T) {
 		t.Error("大小写不同不应判为生产环境")
 	}
 }
+
+func TestLocation(t *testing.T) {
+	// 零值 Config 不应 panic，退回 UTC。
+	if got := (Config{}).Location(); got != time.UTC {
+		t.Errorf("零值 Config 的 Location 应为 UTC，得到 %v", got)
+	}
+
+	shanghai, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		t.Skipf("当前环境没有时区数据：%v", err)
+	}
+	cfg := Config{SiteLocation: shanghai}
+	// 2026-11-03 17:00Z 是北京时间 2026-11-04 01:00——自动 slug 的日期应按站点时区。
+	if got := time.Date(2026, 11, 3, 17, 0, 0, 0, time.UTC).In(cfg.Location()).Format("20060102"); got != "20261104" {
+		t.Errorf("Asia/Shanghai 下应格式化为 20261104，得到 %s", got)
+	}
+
+	// 非法时区名应退回 UTC 而不是 panic。
+	if got := loadLocation("Not/AZone"); got == nil {
+		t.Error("非法时区名不应返回 nil")
+	}
+}

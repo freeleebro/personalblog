@@ -183,6 +183,7 @@ cp .env.example .env
 | --- | --- | --- |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `blog` / `blog` / `beichuang` | 数据库凭据 |
 | `AUTHOR_SLUG` | `author` | 首页作者卡片指向 `authors` 表里的哪一行；没有对应记录就不显示 |
+| `SITE_TIMEZONE` | `Asia/Shanghai` | 站点时区；中文标题自动 slug 的日期、后台「排到明天 09:00」都按它算 |
 | `BLOG_DOMAIN` | 空 | Caddy 对外域名；空则按 IP 走 HTTP，填了自动申请证书 |
 | `SITE_URL` | `http://localhost:3000` | 用于 RSS / sitemap / Open Graph 的绝对地址，部署后改成真实地址 |
 | `SITE_NAME` / `SITE_TAGLINE` / `SITE_DESCRIPTION` | 空 | 站点信息；也可以在管理后台保存 |
