@@ -92,6 +92,27 @@ type AdminMeta struct {
 	PasswordUpdatedAt string `json:"password_updated_at,omitempty"`
 }
 
+// Comment 是文章下的一条读者评论。
+//
+// Email 只出现在后台接口，公开接口永远不会带上它；IPHash 干脆不进 JSON，
+// 只用于后台判断是不是同一来源在刷屏。
+type Comment struct {
+	ID        int64     `json:"id"`
+	PostSlug  string    `json:"post_slug,omitempty"`
+	Author    string    `json:"author"`
+	Email     string    `json:"email,omitempty"`
+	Body      string    `json:"body"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// 评论状态。pending 等待站长审核，published 公开，hidden 是站长隐藏的。
+const (
+	CommentPending   = "pending"
+	CommentPublished = "published"
+	CommentHidden    = "hidden"
+)
+
 // MonthCount 用于归档页的按年月聚合。
 type MonthCount struct {
 	Year  int `json:"year"`

@@ -66,6 +66,8 @@
 .admin-status--draft { background: #fff1cd; color: #9a6500; }
 .admin-status--archived { background: var(--bg-soft); color: var(--fg-subtle); }
 .admin-status--scheduled { background: #e5edff; color: #2f4fbf; }
+.admin-status--pending { background: #fff1cd; color: #9a6500; }
+.admin-status--hidden { background: var(--bg-soft); color: var(--fg-subtle); }
 
 .admin-editor, .admin-editor-empty { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elev); }
 .admin-editor { overflow: hidden; }
@@ -165,3 +167,15 @@
 .admin-password { margin-top: 44px; padding-top: 32px; border-top: 1px solid var(--border); }
 .admin-password .admin-hint { margin-bottom: 20px; }
 .admin-password .admin-notice { max-width: none; margin: 18px 0 0; }
+
+/* 评论审核 */
+.admin-comment-list { display: grid; gap: 12px; margin: 22px 0 0; padding: 0; list-style: none; }
+.admin-comment { padding: 16px 18px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elev); }
+.admin-comment__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; }
+.admin-comment__head strong { color: var(--fg); font-size: 14px; }
+.admin-comment__slug { color: var(--accent-2); font-family: var(--font-mono); font-size: 11px; }
+.admin-comment__time { color: var(--fg-subtle); font-size: 11px; font-variant-numeric: tabular-nums; }
+.admin-comment__email { color: var(--fg-subtle); font-size: 11px; overflow-wrap: anywhere; }
+.admin-comment__body { margin: 10px 0 12px; color: var(--fg-muted); font-size: 13px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.admin-comment__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-comment__actions .btn { padding: 6px 12px; font-size: 12px; }

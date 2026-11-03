@@ -189,6 +189,8 @@ cp .env.example .env
 | `SITE_NAME` / `SITE_TAGLINE` / `SITE_DESCRIPTION` | 空 | 站点信息；也可以在管理后台保存 |
 | `ALLOWED_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | 后端 CORS 白名单 |
 | `TRUSTED_PROXIES` | Docker 内网段 + 回环 | 允许提供 `X-Forwarded-For` 的代理网段，公网直连的伪造头会被忽略 |
+| `COMMENTS_ENABLED` | `true` | 是否开放文章评论；关掉后评论区和提交接口一起停用 |
+| `COMMENT_AUTO_APPROVE` | `false` | 新评论是否跳过审核直接公开；默认先进待审队列 |
 
 > 生产部署请务必修改数据库密码、管理员密码和 `ADMIN_SECRET`。
 
@@ -300,7 +302,7 @@ personal-blog/
 │   │   └── store/              # pgx 连接池 + 查询
 └── web/                        # Next.js 前台
     ├── app/                    # 路由（App Router）
-    ├── components/             # 组件
+    ├── components/             # 组件（含评论区 comments.tsx）
     ├── lib/                    # API 客户端、格式化、TOC
     ├── public/                 # 图片等静态资源（Caddy 给长缓存）
     └── scripts/                # optimize-images.mjs：插画压 WebP；generate-og.mjs：生成分享卡片图
@@ -319,6 +321,8 @@ personal-blog/
 | GET | `/api/v1/posts` | 文章列表，支持 `?q=` 模糊搜索、`?tag=`、`?page=`、`?per_page=` |
 | GET | `/api/v1/posts/{slug}` | 文章详情（含上下篇） |
 | GET | `/api/v1/posts/{slug}/related` | 相关文章 |
+| GET | `/api/v1/posts/{slug}/comments` | 公开评论列表（待审的不会出现） |
+| POST | `/api/v1/posts/{slug}/comments` | 提交评论（蜜罐 + 每 IP 10 分钟 5 条） |
 | POST | `/api/v1/posts/{slug}/views` | 浏览量 +1 |
 | GET | `/api/v1/tags` | 标签列表（含文章数） |
 | GET | `/api/v1/tags/{slug}` | 单个标签 |
@@ -346,6 +350,9 @@ personal-blog/
 | POST | `/api/v1/admin/uploads` | 上传配图（multipart，字段名 `file`），返回 `/media/...` |
 | GET | `/api/v1/admin/preview/{slug}` | 生成 1 小时有效的草稿预览链接 |
 | GET | `/api/v1/admin/export` | 导出全部内容为 zip（文章 `.md` + 页面 + 图片 + `posts.json`） |
+| GET | `/api/v1/admin/comments` | 评论列表，`?status=pending\|published\|hidden`，附带三态计数 |
+| PUT | `/api/v1/admin/comments/{id}` | 改评论状态（`{status}`） |
+| DELETE | `/api/v1/admin/comments/{id}` | 删除评论 |
 | POST/PUT | `/api/v1/admin/tags` / `.../{slug}` | 创建/更新标签 |
 | DELETE | `/api/v1/admin/tags/{slug}` | 删除标签 |
 | POST | `/api/v1/admin/pages` | 创建/更新独立页面 |
@@ -368,8 +375,9 @@ JSON 一并返回，列表页恒定为一次查询。
 所以 `view_count + 1` 这类更新不会把 `updated_at` 顶掉——「最近更新」才是真的内容变更时间。
 
 **4. 迁移是内嵌的、幂等的、按文件分事务。** SQL 通过 `go:embed` 编进二进制，
-用 `schema_migrations` 表记录已执行版本；每个文件一个事务，失败整体回滚，重复启动无副作用。
-`pg_trgm` 扩展用 DO 块做了降级兼容，权限不足时不会让整个迁移崩掉。
+用 `schema_migrations` 表记录已执行版本及其 SHA-256 校验和；每个文件一个事务，失败整体回滚，
+重复启动无副作用。已应用的迁移文件如果被改过，启动会直接报错而不是继续跑（老库首次启动会
+补记校验和）。`pg_trgm` 扩展用 DO 块做了降级兼容，权限不足时不会让整个迁移崩掉。
 
 **5. 目录锚点和正文标题必须严格对齐。** 目录是自己根据 Markdown 标题生成的，
 锚点必须和 `rehype-slug` 渲染出来的 `id` 完全一致，否则点了跳不过去。
@@ -411,6 +419,13 @@ RSS、sitemap 里的统计视图）都带 `published_at <= now()`，后台编辑
 压缩成 `hello-world`；只要标题里含中文（或全角标点），就改用 `post-20261103-a1b2c3`
 （日期 + 标题哈希），对搜索引擎和分享都更友好。想手写可读地址仍然可以直接填，
 比如 `ce-shi`。标签不同：标签量少、URL 短，`/tags/中文` 这种形式保留原样。
+
+**13. 评论自己实现，默认先审后发。** 没用 giscus 之类的第三方：读者不用注册 GitHub、
+也不用给仓库装 App。提交走 `/api/v1/posts/{slug}/comments`，带一个隐藏的 `website` 蜜罐字段
+（机器人填了就静默丢弃）、每 IP 10 分钟最多 5 条；IP 不落库，只存
+`sha256(ip|ADMIN_SECRET)` 前 16 位，用于排障和反垃圾，不能反查。新评论默认进 `pending`，
+后台「评论」标签页通过后才公开；想改成即时显示设 `COMMENT_AUTO_APPROVE=true`。
+评论用 `post_slug` 关联而不是外键：文章删了，评论留着也不会报错。
 
 ---
 

@@ -382,3 +382,168 @@ kbd { padding: 2px 5px; border: 1px solid var(--border-strong); border-radius: 4
   .post-nav { grid-template-columns: 1fr; }
   .post-nav__item--next { text-align: left; }
 }
+
+/* ---------- 评论区 ---------- */
+
+.comments {
+  margin-top: 64px;
+  padding-top: 38px;
+  border-top: 1px solid var(--border);
+}
+
+.comments__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.comments__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: 0.02em;
+}
+
+.comments__count {
+  min-width: 26px;
+  padding: 2px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--fg-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.comments__empty {
+  margin: 0 0 26px;
+  color: var(--fg-subtle);
+  font-size: 14px;
+}
+
+.comments__list {
+  margin: 0 0 30px;
+  padding: 0;
+  list-style: none;
+}
+
+.comment {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.comment:first-child {
+  padding-top: 0;
+}
+
+.comment__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.comment__author {
+  color: var(--fg);
+  font-size: 14px;
+}
+
+.comment__time {
+  color: var(--fg-subtle);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.comment__body {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 15px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.comment-form {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+}
+
+.comment-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.comment-form__field {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+.comment-form__input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.comment-form__input:focus {
+  outline: none;
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px rgb(255 107 154 / 0.12);
+}
+
+.comment-form__textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+/* 蜜罐：移到视口外而不是 display:none，部分脚本会跳过隐藏元素 */
+.comment-form__hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.comment-form__error {
+  margin: 0;
+  color: #ff7d9c;
+  font-size: 13px;
+}
+
+.comment-form__notice {
+  margin: 0;
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.comment-form__actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.comment-form__hint {
+  color: var(--fg-subtle);
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .comment-form__row { grid-template-columns: 1fr; }
+  .comments { margin-top: 46px; }
+}

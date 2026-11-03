@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { ReadingProgress } from '@/components/reading-progress';
+import { Comments } from '@/components/comments';
 import { Markdown } from '@/components/markdown';
 import { PostCard } from '@/components/post-card';
 import { TableOfContents } from '@/components/table-of-contents';
@@ -136,6 +137,8 @@ export default async function PostPage({ params }: { params: Params }) {
                   <span className="post-nav__spacer">已经是最后一篇</span>
                 )}
               </nav>
+
+              <Comments slug={post.slug} />
 
               {related.length > 0 ? (
                 <>

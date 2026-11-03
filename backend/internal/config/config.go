@@ -58,6 +58,11 @@ type Config struct {
 	// UploadDir 是文章配图的落盘目录。生产环境挂一个数据卷进来，
 	// 这样换镜像不会把用户上传的图片一起换掉。
 	UploadDir string
+
+	// CommentsEnabled 控制文章页是否展示评论；CommentAutoApprove 为 true 时
+	// 新评论直接公开，否则先进待审核队列（默认，适合公开站点防垃圾评论）。
+	CommentsEnabled    bool
+	CommentAutoApprove bool
 }
 
 // Load 读取配置。查找顺序：真实环境变量 > 当前目录 .env > 上一级目录 .env。
@@ -97,6 +102,10 @@ func Load() Config {
 
 		// 本地开发默认落在 backend/data/uploads；容器里由 UPLOAD_DIR 指到数据卷。
 		UploadDir: getEnv("UPLOAD_DIR", "./data/uploads"),
+
+		// 评论默认开启，但新评论需要站长在后台点「通过」才公开。
+		CommentsEnabled:    getBool("COMMENTS_ENABLED", true),
+		CommentAutoApprove: getBool("COMMENT_AUTO_APPROVE", false),
 	}
 }
 

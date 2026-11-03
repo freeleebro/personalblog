@@ -102,3 +102,20 @@ export type TagDetail = {
   tag: Tag;
   posts: Post[];
 };
+
+/** 一条读者评论。email 只在后台接口出现，公开接口始终为空字符串。 */
+export type Comment = {
+  id: number;
+  post_slug?: string;
+  author: string;
+  email?: string;
+  body: string;
+  status: string;
+  created_at: string;
+};
+
+export type CommentCounts = {
+  pending: number;
+  published: number;
+  hidden: number;
+};

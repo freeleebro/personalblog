@@ -3,6 +3,8 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -10,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -65,8 +68,18 @@ func (s *Store) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
 // Close 释放连接池。
 func (s *Store) Close() { s.pool.Close() }
 
+// migrationChecksum 返回迁移文件内容的 SHA-256 十六进制摘要。
+// 用来发现「已经应用过的迁移文件后来被改动」——这种改动不会重跑，
+// 数据库结构与代码预期会悄悄分叉。
+func migrationChecksum(body []byte) string {
+	sum := sha256.Sum256(body)
+	return hex.EncodeToString(sum[:])
+}
+
 // Migrate 按文件名升序执行 embed 的 SQL 迁移，已执行过的会跳过。
 // 每个文件在独立事务中执行，失败即整体回滚。
+// 已应用的迁移会记录校验和：如果文件在应用后被修改，启动时直接报错，
+// 避免「本地库是旧结构、代码按新结构查询」这类难查的问题。
 func (s *Store) Migrate(ctx context.Context, files fs.FS) ([]string, error) {
 	if _, err := s.pool.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -74,6 +87,12 @@ func (s *Store) Migrate(ctx context.Context, files fs.FS) ([]string, error) {
 			applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		)`); err != nil {
 		return nil, fmt.Errorf("创建 schema_migrations 失败: %w", err)
+	}
+	// 老库里的 schema_migrations 只有 version/applied_at，补上校验和列。
+	if _, err := s.pool.Exec(ctx,
+		`ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS checksum TEXT NOT NULL DEFAULT ''`,
+	); err != nil {
+		return nil, fmt.Errorf("升级 schema_migrations 失败: %w", err)
 	}
 
 	entries, err := fs.ReadDir(files, ".")
@@ -91,19 +110,39 @@ func (s *Store) Migrate(ctx context.Context, files fs.FS) ([]string, error) {
 
 	applied := make([]string, 0, len(names))
 	for _, name := range names {
-		var done bool
-		if err := s.pool.QueryRow(ctx,
-			`SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version = $1)`, name,
-		).Scan(&done); err != nil {
-			return applied, fmt.Errorf("查询迁移状态 %s 失败: %w", name, err)
-		}
-		if done {
-			continue
-		}
-
 		body, err := fs.ReadFile(files, name)
 		if err != nil {
 			return applied, fmt.Errorf("读取迁移 %s 失败: %w", name, err)
+		}
+		checksum := migrationChecksum(body)
+
+		var recorded string
+		err = s.pool.QueryRow(ctx,
+			`SELECT checksum FROM schema_migrations WHERE version = $1`, name,
+		).Scan(&recorded)
+		switch {
+		case err == nil:
+			if recorded == "" {
+				// 引入校验和之前应用过的迁移：补记当前内容，不重跑。
+				if _, uerr := s.pool.Exec(ctx,
+					`UPDATE schema_migrations SET checksum = $2 WHERE version = $1`,
+					name, checksum,
+				); uerr != nil {
+					return applied, fmt.Errorf("补记迁移校验和 %s 失败: %w", name, uerr)
+				}
+				continue
+			}
+			if recorded != checksum {
+				return applied, fmt.Errorf(
+					"迁移文件 %s 在应用后被修改（记录 %s，当前 %s）；请新增一个迁移文件而不是改历史文件",
+					name, recorded[:12], checksum[:12],
+				)
+			}
+			continue
+		case errors.Is(err, pgx.ErrNoRows):
+			// 未应用，继续走下面的执行流程。
+		default:
+			return applied, fmt.Errorf("查询迁移状态 %s 失败: %w", name, err)
 		}
 
 		tx, err := s.pool.Begin(ctx)
@@ -115,7 +154,7 @@ func (s *Store) Migrate(ctx context.Context, files fs.FS) ([]string, error) {
 			return applied, fmt.Errorf("执行迁移 %s 失败: %w", name, err)
 		}
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO schema_migrations (version) VALUES ($1)`, name,
+			`INSERT INTO schema_migrations (version, checksum) VALUES ($1, $2)`, name, checksum,
 		); err != nil {
 			_ = tx.Rollback(ctx)
 			return applied, fmt.Errorf("记录迁移 %s 失败: %w", name, err)

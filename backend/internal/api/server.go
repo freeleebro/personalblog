@@ -20,6 +20,8 @@ type Server struct {
 
 	// login 记录登录失败次数，用于账号/IP 维度的锁定。
 	login loginGuard
+	// comments 是访客评论的滑动窗口限流器（同一 IP 10 分钟内最多 5 条）。
+	comments commentLimiter
 	// cache 是读接口的短 TTL 响应缓存，写操作后整体失效。
 	cache responseCache
 }
@@ -41,6 +43,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/posts/{slug}/related", s.handleRelatedPosts)
 	mux.Handle("POST /api/v1/posts/{slug}/views",
 		middleware.RateLimit(30, time.Minute)(http.HandlerFunc(s.handleIncrementViews)))
+
+	// ---- 评论：读公开，写对访客开放（自带限流 + 审核队列）----
+	mux.HandleFunc("GET /api/v1/posts/{slug}/comments", s.handleListComments)
+	mux.HandleFunc("POST /api/v1/posts/{slug}/comments", s.handleCreateComment)
 
 	mux.HandleFunc("GET /api/v1/tags", s.handleListTags)
 	mux.HandleFunc("GET /api/v1/tags/{slug}", s.handleGetTag)
@@ -78,6 +84,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/admin/uploads", auth(s.handleAdminUpload))
 	mux.HandleFunc("GET /api/v1/admin/preview/{slug}", auth(s.handleAdminPreviewLink))
 	mux.HandleFunc("GET /api/v1/admin/export", auth(s.handleAdminExport))
+
+	// 评论审核：列表、通过/隐藏、删除。
+	mux.HandleFunc("GET /api/v1/admin/comments", auth(s.handleAdminListComments))
+	mux.HandleFunc("PUT /api/v1/admin/comments/{id}", auth(s.handleAdminUpdateComment))
+	mux.HandleFunc("DELETE /api/v1/admin/comments/{id}", auth(s.handleAdminDeleteComment))
 
 	mux.HandleFunc("POST /api/v1/admin/tags", auth(s.handleAdminSaveTag))
 	mux.HandleFunc("PUT /api/v1/admin/tags/{slug}", auth(s.handleAdminSaveTag))

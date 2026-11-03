@@ -4,10 +4,10 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 
 import { adminApi } from '@/lib/admin-api';
 import { SITE_TEXT_KEYS } from '@/lib/site-text';
-import type { Post, Tag } from '@/lib/types';
+import type { Comment, CommentCounts, Post, Tag } from '@/lib/types';
 import { MarkdownPreview } from './markdown-preview';
 
-type Tab = 'posts' | 'tags' | 'about' | 'settings';
+type Tab = 'posts' | 'comments' | 'tags' | 'about' | 'settings';
 
 // 编辑中的文章草稿
 type Draft = {
@@ -299,6 +299,9 @@ export function AdminEditor({ onLogout }: { onLogout: () => void }) {
           <button className={`admin-tab${tab === 'posts' ? ' admin-tab--active' : ''}`} onClick={() => setTab('posts')}>
             文章
           </button>
+          <button className={`admin-tab${tab === 'comments' ? ' admin-tab--active' : ''}`} onClick={() => setTab('comments')}>
+            评论
+          </button>
           <button className={`admin-tab${tab === 'tags' ? ' admin-tab--active' : ''}`} onClick={() => setTab('tags')}>
             分类 / 标签
           </button>
@@ -390,6 +393,8 @@ export function AdminEditor({ onLogout }: { onLogout: () => void }) {
           )}
           </div>
         </>
+      ) : tab === 'comments' ? (
+        <CommentsPanel />
       ) : tab === 'tags' ? (
         <TagsPanel tags={tags} onChanged={load} />
       ) : tab === 'about' ? (
@@ -1305,5 +1310,156 @@ function PasswordPanel() {
       </button>
       {msg ? <p className="admin-notice">{msg}</p> : null}
     </section>
+  );
+}
+
+/**
+ * 评论审核面板：待审核 → 通过 / 隐藏 / 删除。
+ * 公开站点默认所有新评论都进待审队列，避免广告机器人直接挂到文章下面。
+ */
+function CommentsPanel() {
+  const [filter, setFilter] = useState<'pending' | 'published' | 'hidden' | ''>('pending');
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [counts, setCounts] = useState<CommentCounts>({ pending: 0, published: 0, hidden: 0 });
+  const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState('');
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await adminApi.listComments(filter);
+      setComments(data.comments);
+      setCounts(data.counts);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '加载评论失败');
+    } finally {
+      setLoading(false);
+    }
+  }, [filter]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function act(id: number, status: 'pending' | 'published' | 'hidden' | 'delete') {
+    setBusyId(id);
+    setMsg('');
+    try {
+      if (status === 'delete') {
+        await adminApi.deleteComment(id);
+        setMsg('评论已删除');
+      } else {
+        await adminApi.updateComment(id, status);
+        setMsg(
+          status === 'published' ? '评论已公开' : status === 'hidden' ? '评论已隐藏' : '评论已退回待审',
+        );
+      }
+      await load();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '操作失败');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const tabs: { value: typeof filter; label: string; count: number }[] = [
+    { value: 'pending', label: '待审核', count: counts.pending },
+    { value: 'published', label: '已公开', count: counts.published },
+    { value: 'hidden', label: '已隐藏', count: counts.hidden },
+    { value: '', label: '全部', count: counts.pending + counts.published + counts.hidden },
+  ];
+
+  return (
+    <>
+      <div className="admin-page-intro">
+        <div>
+          <p className="admin-kicker">COMMENTS / MODERATION</p>
+          <h1>评论审核</h1>
+          <p>新评论默认进待审队列，通过之后才会出现在文章页。</p>
+        </div>
+        <div className="admin-page-stats">
+          <strong>{counts.pending}</strong><span>条待审</span>
+          <strong>{counts.published}</strong><span>条已公开</span>
+        </div>
+      </div>
+
+      <div className="admin-quick-row">
+        {tabs.map((t) => (
+          <button
+            key={t.label}
+            className={`btn ${filter === t.value ? 'btn--primary' : 'btn--ghost'}`}
+            onClick={() => setFilter(t.value)}
+          >
+            {t.label}（{t.count}）
+          </button>
+        ))}
+      </div>
+
+      {msg ? <p className="admin-notice">{msg}</p> : null}
+
+      {loading ? (
+        <p className="admin-loading">加载中…</p>
+      ) : comments.length === 0 ? (
+        <p className="admin-empty">
+          {filter === 'pending' ? '没有待审核的评论。' : '这里还没有评论。'}
+        </p>
+      ) : (
+        <ul className="admin-comment-list">
+          {comments.map((comment) => (
+            <li key={comment.id} className="admin-comment">
+              <div className="admin-comment__head">
+                <strong>{comment.author}</strong>
+                <span className="admin-comment__slug">/{comment.post_slug}</span>
+                <span className={`admin-status admin-status--${comment.status}`}>
+                  {comment.status === 'pending' ? '待审' : comment.status === 'published' ? '已公开' : '已隐藏'}
+                </span>
+                <time className="admin-comment__time">
+                  {new Date(comment.created_at).toLocaleString('zh-CN')}
+                </time>
+                {comment.email ? <span className="admin-comment__email">{comment.email}</span> : null}
+              </div>
+              <p className="admin-comment__body">{comment.body}</p>
+              <div className="admin-comment__actions">
+                {comment.status !== 'published' ? (
+                  <button
+                    className="btn btn--primary"
+                    disabled={busyId === comment.id}
+                    onClick={() => act(comment.id, 'published')}
+                  >
+                    通过
+                  </button>
+                ) : null}
+                {comment.status !== 'hidden' ? (
+                  <button
+                    className="btn btn--ghost"
+                    disabled={busyId === comment.id}
+                    onClick={() => act(comment.id, 'hidden')}
+                  >
+                    隐藏
+                  </button>
+                ) : null}
+                {comment.status !== 'pending' ? (
+                  <button
+                    className="btn btn--ghost"
+                    disabled={busyId === comment.id}
+                    onClick={() => act(comment.id, 'pending')}
+                  >
+                    退回待审
+                  </button>
+                ) : null}
+                <button
+                  className="btn btn--ghost"
+                  disabled={busyId === comment.id}
+                  onClick={() => act(comment.id, 'delete')}
+                >
+                  删除
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }

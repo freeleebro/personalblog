@@ -3,7 +3,7 @@
 // 管理后台的 API 客户端。所有写操作都带 Bearer token。
 // token 存在 localStorage，由调用方（登录后）注入。
 
-import type { Page, Post, Site, Tag } from './types';
+import type { Comment, CommentCounts, Page, Post, Site, Tag } from './types';
 
 // 管理后台走同源代理 /api-proxy，避免跨域，也不把后端地址暴露给浏览器。
 const ADMIN_BASE = '/api-proxy';
@@ -182,6 +182,19 @@ export const adminApi = {
       filename: match?.[1] ?? 'blog-export.zip',
     };
   },
+
+  /** 评论审核：status 留空取全部，用于后台列表。 */
+  listComments: (status = '') =>
+    adminRequest<{ comments: Comment[]; counts: CommentCounts }>(
+      `/admin/comments${status ? `?status=${encodeURIComponent(status)}` : ''}`,
+    ),
+  updateComment: (id: number, status: 'pending' | 'published' | 'hidden') =>
+    adminRequest<{ id: number; status: string }>(`/admin/comments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
+  deleteComment: (id: number) =>
+    adminRequest<{ deleted: boolean }>(`/admin/comments/${id}`, { method: 'DELETE' }),
 
   listTags: () => adminRequest<Tag[]>('/tags'),
   saveTag: (tag: { slug: string; name: string; color: string; description: string }) =>
