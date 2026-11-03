@@ -65,6 +65,10 @@ func (s *Server) Handler() http.Handler {
 	auth := s.requireAuth
 	mux.HandleFunc("GET /api/v1/admin/whoami", auth(s.handleAdminWhoami))
 
+	// 改密码：校验旧密码，另外限流，防止拿到 token 的人在这里慢慢试旧密码。
+	mux.Handle("POST /api/v1/admin/password",
+		middleware.RateLimit(10, time.Minute)(auth(s.handleAdminChangePassword)))
+
 	mux.HandleFunc("GET /api/v1/admin/posts", auth(s.handleAdminListPosts))
 	mux.HandleFunc("GET /api/v1/admin/posts/{slug}", auth(s.handleAdminGetPost))
 	mux.HandleFunc("POST /api/v1/admin/posts", auth(s.handleAdminSavePost))

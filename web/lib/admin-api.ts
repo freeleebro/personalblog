@@ -79,6 +79,16 @@ export const adminApi = {
 
   whoami: () => adminRequest<{ username: string; displayName: string }>('/admin/whoami'),
 
+  /**
+   * 修改当前账号密码。旧密码由服务端校验。
+   * 注意：改完 token 仍然有效，其他设备不会被踢下线（无状态签名，见 README）。
+   */
+  changePassword: (currentPassword: string, newPassword: string) =>
+    adminRequest<{ changed_at: string; sessions_revoked: boolean }>('/admin/password', {
+      method: 'POST',
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    }),
+
   listPosts: () => adminRequest<Post[]>('/admin/posts'),
   getPost: (slug: string) => adminRequest<Post>(`/admin/posts/${encodeURIComponent(slug)}`),
   savePost: (post: {

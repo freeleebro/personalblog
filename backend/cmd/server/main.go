@@ -16,6 +16,7 @@ import (
 	"github.com/freeleebro/personalblog/backend/internal/api"
 	"github.com/freeleebro/personalblog/backend/internal/auth"
 	"github.com/freeleebro/personalblog/backend/internal/config"
+	"github.com/freeleebro/personalblog/backend/internal/domain"
 	"github.com/freeleebro/personalblog/backend/internal/middleware"
 	"github.com/freeleebro/personalblog/backend/internal/migrations"
 	"github.com/freeleebro/personalblog/backend/internal/store"
@@ -160,6 +161,18 @@ func syncAdminPassword(ctx context.Context, st *store.Store, cfg config.Config, 
 	if cfg.AdminPassword == "" {
 		return nil
 	}
+
+	// 在后台改过密码之后，环境变量里留着的旧值本来就会对不上，
+	// 这时候不该每次重启都喊一声「密码不一致」。
+	// 显式打开 ADMIN_PASSWORD_RESET 时仍然优先按环境变量重置。
+	if !cfg.AdminPasswordReset {
+		var meta domain.AdminMeta
+		if err := st.Setting(ctx, domain.SettingAdminMeta, &meta); err == nil && meta.PasswordUpdatedAt != "" {
+			log.Debug("管理员密码已在后台修改过，跳过环境变量比对", "username", cfg.AdminUsername)
+			return nil
+		}
+	}
+
 	u, err := st.GetAdminUserByUsername(ctx, cfg.AdminUsername)
 	if errors.Is(err, store.ErrNotFound) {
 		// 用户名也改过了，没有把握，交给人工处理。

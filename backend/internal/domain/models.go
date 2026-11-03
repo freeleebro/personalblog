@@ -80,6 +80,18 @@ type Site struct {
 	Recent   []Post            `json:"recent"`
 }
 
+// SettingAdminMeta 是 settings 表里存放后台运维元数据的键。
+const SettingAdminMeta = "admin_meta"
+
+// AdminMeta 记录后台账号的运维元数据。
+//
+// 目前只有 PasswordUpdatedAt 一个字段：在后台改过密码之后，启动时就不再
+// 拿环境变量里的 ADMIN_PASSWORD 去和数据库比对，免得每次重启都打一条
+// 「密码不一致」的误导性警告（环境变量里留着旧值本来就很正常）。
+type AdminMeta struct {
+	PasswordUpdatedAt string `json:"password_updated_at,omitempty"`
+}
+
 // MonthCount 用于归档页的按年月聚合。
 type MonthCount struct {
 	Year  int `json:"year"`

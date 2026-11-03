@@ -161,3 +161,7 @@
   .admin-tag-add .btn { grid-column: 1 / -1; }
   .admin-login__card { padding: 28px 22px; }
 }
+
+.admin-password { margin-top: 44px; padding-top: 32px; border-top: 1px solid var(--border); }
+.admin-password .admin-hint { margin-bottom: 20px; }
+.admin-password .admin-notice { max-width: none; margin: 18px 0 0; }

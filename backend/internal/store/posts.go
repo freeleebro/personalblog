@@ -103,10 +103,10 @@ type PostFilter struct {
 
 // PostPage 是分页结果。
 type PostPage struct {
-	Items    []domain.Post
-	Total    int
-	Page     int
-	PerPage  int
+	Items   []domain.Post
+	Total   int
+	Page    int
+	PerPage int
 }
 
 // TotalPages 返回总页数，至少为 1。

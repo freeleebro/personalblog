@@ -63,6 +63,12 @@ Caddy 反代依赖 `TRUSTED_PROXIES`（默认已包含 Docker 内网段），否
 > 改 `ADMIN_PASSWORD` 只会影响「首次创建账号」那一次。账号已经存在时，后端启动会比对
 > 环境变量里的密码与库里的哈希，不一致只打一条警告；确实要重置就把 `ADMIN_PASSWORD_RESET=1`
 > 加进 `.env.server` 重启一次，重置完再改回 `0`。
+>
+> **日常改密码不用重启**：登录后台 →「站点设置」→ 页面底部的「修改密码」，输入当前密码和新密码
+> 即可，立即生效。改完之后 `ADMIN_PASSWORD` 就过期作废了（留着旧值也不会再触发警告）。
+>
+> 注意登录 token 是无状态 HMAC 签名，改密码**不会**让已经登录的设备掉线。要把所有设备踢下线，
+> 只能换掉 `ADMIN_SECRET` 再重启一次容器。
 
 常用命令：
 
@@ -272,6 +278,7 @@ personal-blog/
 | --- | --- | --- |
 | POST | `/api/v1/admin/login` | 登录，返回 token（无需鉴权） |
 | GET | `/api/v1/admin/whoami` | 校验 token、返回当前账号 |
+| POST | `/api/v1/admin/password` | 修改当前账号密码（`{current_password,new_password}`） |
 | GET | `/api/v1/admin/posts` | 文章列表（含草稿/归档） |
 | GET | `/api/v1/admin/posts/{slug}` | 单篇（含正文，供编辑器回填） |
 | POST/PUT | `/api/v1/admin/posts` / `.../{slug}` | 创建/更新文章 |
@@ -332,6 +339,12 @@ RSS、sitemap 里的统计视图）都带 `published_at <= now()`，后台编辑
 **10. 草稿预览用 HMAC 签名，不额外存表。** 后台点「预览链接」时后端用 `ADMIN_SECRET`
 对 `slug|过期时间` 签名，1 小时有效；前台 `/preview/{slug}` 校验签名后才返回内容，
 签名不对返回 404、过期返回 410，并带 `X-Robots-Tag: noindex`。
+
+**11. 改密码不吊销已签发的 token。** token 是无状态 HMAC，服务端不存会话表，
+所以「改密码后所有设备重新登录」需要额外的会话版本机制，个人博客不值得为它加一张表。
+换 `ADMIN_SECRET` 会让所有旧 token 立即失效，这就是「强制下线」的开关。
+后台改密码时会往 `settings` 写一条 `admin_meta.password_updated_at`，
+启动检查据此跳过「环境变量密码与数据库不一致」的警告。
 
 ---
 

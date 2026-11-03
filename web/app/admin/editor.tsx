@@ -1159,6 +1159,93 @@ function SettingsPanel() {
       </div>
 
       <button className="btn btn--primary" onClick={save} disabled={!loaded}>保存设置</button>
+
+      <PasswordPanel />
     </div>
+  );
+}
+
+/**
+ * 后台改密码。单独成块：它不参与上面的「保存设置」，点了就即时生效。
+ */
+function PasswordPanel() {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (next !== confirm) {
+      setMsg('两次输入的新密码不一致');
+      return;
+    }
+    if (next.length < 8) {
+      setMsg('新密码至少 8 个字符');
+      return;
+    }
+    setBusy(true);
+    setMsg('');
+    try {
+      await adminApi.changePassword(current, next);
+      setCurrent('');
+      setNext('');
+      setConfirm('');
+      setMsg('密码已修改 ✓ 下次登录请用新密码');
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '修改失败');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="admin-password">
+      <h3 className="admin-section-title">修改密码</h3>
+      <p className="admin-hint">
+        改完立刻生效，不用重启容器。已经登录的其他设备不会被踢下线——
+        想把所有设备都下线，需要换掉 .env.server 里的 ADMIN_SECRET 再重启一次。
+      </p>
+
+      <label className="admin-field">
+        <span className="admin-field__label">当前密码</span>
+        <input
+          className="admin-input"
+          type="password"
+          autoComplete="current-password"
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+        />
+      </label>
+      <label className="admin-field">
+        <span className="admin-field__label">新密码（至少 8 位）</span>
+        <input
+          className="admin-input"
+          type="password"
+          autoComplete="new-password"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+        />
+      </label>
+      <label className="admin-field">
+        <span className="admin-field__label">确认新密码</span>
+        <input
+          className="admin-input"
+          type="password"
+          autoComplete="new-password"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+        />
+      </label>
+
+      <button
+        className="btn"
+        onClick={submit}
+        disabled={busy || !current || !next || !confirm}
+      >
+        {busy ? '提交中…' : '修改密码'}
+      </button>
+      {msg ? <p className="admin-notice">{msg}</p> : null}
+    </section>
   );
 }
