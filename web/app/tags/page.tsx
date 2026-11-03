@@ -4,7 +4,9 @@ import type { CSSProperties } from 'react';
 
 import { TagChip } from '@/components/tag-chip';
 import { getTags } from '@/lib/api';
+import { siteText, SITE_TEXT_KEYS } from '@/lib/site-text';
 import type { Tag } from '@/lib/types';
+import { loadSite } from '../layout';
 
 export const metadata: Metadata = {
   title: '标签',
@@ -20,13 +22,18 @@ export default async function TagsPage() {
   }
 
   const total = tags.reduce((sum, tag) => sum + tag.post_count, 0);
+  const site = await loadSite().catch(() => null);
 
   return (
     <div className="shell page">
       <div className="page__head">
-        <h1 className="page__title">标签</h1>
+        <h1 className="page__title">{siteText(site, SITE_TEXT_KEYS.tagsTitle)}</h1>
         <p className="page__desc">
-          {tags.length} 个标签，共 {total} 次引用。点进去可以看这个主题下的全部文章。
+          {site?.texts?.[SITE_TEXT_KEYS.tagsLead]?.trim() || (
+            <>
+              {tags.length} 个标签，共 {total} 次引用。点进去可以看这个主题下的全部文章。
+            </>
+          )}
         </p>
       </div>
 

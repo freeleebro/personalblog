@@ -3,7 +3,9 @@ import Link from 'next/link';
 
 import { PostCard } from '@/components/post-card';
 import { getPosts } from '@/lib/api';
+import { siteText, SITE_TEXT_KEYS } from '@/lib/site-text';
 import type { Post } from '@/lib/types';
+import { loadSite } from '../layout';
 
 export const metadata: Metadata = {
   title: '搜索',
@@ -25,12 +27,16 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
     }
   }
 
+  const site = await loadSite().catch(() => null);
+
   return (
     <div className="shell page">
       <div className="page__head">
-        <h1 className="page__title">搜索</h1>
+        <h1 className="page__title">{siteText(site, SITE_TEXT_KEYS.searchTitle)}</h1>
         <p className="page__desc">
-          {keyword ? `关键词「${keyword}」，找到 ${posts.length} 篇文章。` : '输入关键词，在标题、摘要与正文中查找。'}
+          {keyword
+            ? `关键词「${keyword}」，找到 ${posts.length} 篇文章。`
+            : siteText(site, SITE_TEXT_KEYS.searchLead)}
         </p>
       </div>
 

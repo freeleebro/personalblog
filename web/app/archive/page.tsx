@@ -4,7 +4,9 @@ import type { CSSProperties } from 'react';
 
 import { getArchive, getPosts } from '@/lib/api';
 import { formatDateShort, isoDate } from '@/lib/format';
+import { siteText, SITE_TEXT_KEYS } from '@/lib/site-text';
 import type { ArchiveYear, Post } from '@/lib/types';
+import { loadSite } from '../layout';
 
 export const metadata: Metadata = {
   title: '归档',
@@ -16,6 +18,7 @@ export default async function ArchivePage() {
     getPosts({ perPage: 50 }),
     getArchive(),
   ]);
+  const site = await loadSite().catch(() => null);
 
   const posts: Post[] = postsResult.status === 'fulfilled' ? postsResult.value.items : [];
   const years: ArchiveYear[] = yearsResult.status === 'fulfilled' ? yearsResult.value : [];
@@ -36,9 +39,13 @@ export default async function ArchivePage() {
   return (
     <div className="shell page">
       <div className="page__head">
-        <h1 className="page__title">归档</h1>
+        <h1 className="page__title">{siteText(site, SITE_TEXT_KEYS.archiveTitle)}</h1>
         <p className="page__desc">
-          共 {posts.length} 篇文章，跨越 {sortedYears.length || 0} 个年份。
+          {site?.texts?.[SITE_TEXT_KEYS.archiveLead]?.trim() || (
+            <>
+              共 {posts.length} 篇文章，跨越 {sortedYears.length || 0} 个年份。
+            </>
+          )}
         </p>
       </div>
 

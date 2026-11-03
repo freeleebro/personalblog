@@ -1053,6 +1053,111 @@ function SettingsPanel() {
         />
       </label>
 
+      <h3 className="admin-section-title" style={{ marginTop: 28 }}>页面文案</h3>
+      <p className="admin-hint">这些是各页面的标题与提示语，留空就用代码里的默认文案。</p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
+        <label className="admin-field">
+          <span className="admin-field__label">文章页标题</span>
+          <input
+            className="admin-input"
+            value={texts[SITE_TEXT_KEYS.postsTitle] ?? ''}
+            onChange={(e) => setText(SITE_TEXT_KEYS.postsTitle, e.target.value)}
+            placeholder="全部文章"
+          />
+        </label>
+        <label className="admin-field">
+          <span className="admin-field__label">文章页副标题</span>
+          <input
+            className="admin-input"
+            value={texts[SITE_TEXT_KEYS.postsLead] ?? ''}
+            onChange={(e) => setText(SITE_TEXT_KEYS.postsLead, e.target.value)}
+            placeholder="留空显示「共 N 篇…」"
+          />
+        </label>
+        <label className="admin-field">
+          <span className="admin-field__label">文章页空状态</span>
+          <input
+            className="admin-input"
+            value={texts[SITE_TEXT_KEYS.postsEmpty] ?? ''}
+            onChange={(e) => setText(SITE_TEXT_KEYS.postsEmpty, e.target.value)}
+            placeholder="这里还没有文章…"
+          />
+        </label>
+        <label className="admin-field">
+          <span className="admin-field__label">归档页标题</span>
+          <input
+            className="admin-input"
+            value={texts[SITE_TEXT_KEYS.archiveTitle] ?? ''}
+            onChange={(e) => setText(SITE_TEXT_KEYS.archiveTitle, e.target.value)}
+            placeholder="归档"
+          />
+        </label>
+        <label className="admin-field">
+          <span className="admin-field__label">归档页副标题</span>
+          <input
+            className="admin-input"
+            value={texts[SITE_TEXT_KEYS.archiveLead] ?? ''}
+            onChange={(e) => setText(SITE_TEXT_KEYS.archiveLead, e.target.value)}
+            placeholder="留空显示「共 N 篇…」"
+          />
+        </label>
+        <label className="admin-field">
+          <span className="admin-field__label">标签页标题</span>
+          <input
+            className="admin-input"
+            value={texts[SITE_TEXT_KEYS.tagsTitle] ?? ''}
+            onChange={(e) => setText(SITE_TEXT_KEYS.tagsTitle, e.target.value)}
+            placeholder="标签"
+          />
+        </label>
+        <label className="admin-field">
+          <span className="admin-field__label">标签页副标题</span>
+          <input
+            className="admin-input"
+            value={texts[SITE_TEXT_KEYS.tagsLead] ?? ''}
+            onChange={(e) => setText(SITE_TEXT_KEYS.tagsLead, e.target.value)}
+            placeholder="留空显示「N 个标签…」"
+          />
+        </label>
+        <label className="admin-field">
+          <span className="admin-field__label">搜索页标题</span>
+          <input
+            className="admin-input"
+            value={texts[SITE_TEXT_KEYS.searchTitle] ?? ''}
+            onChange={(e) => setText(SITE_TEXT_KEYS.searchTitle, e.target.value)}
+            placeholder="搜索"
+          />
+        </label>
+        <label className="admin-field">
+          <span className="admin-field__label">搜索页提示</span>
+          <input
+            className="admin-input"
+            value={texts[SITE_TEXT_KEYS.searchLead] ?? ''}
+            onChange={(e) => setText(SITE_TEXT_KEYS.searchLead, e.target.value)}
+            placeholder="输入关键词…"
+          />
+        </label>
+        <label className="admin-field">
+          <span className="admin-field__label">404 标题</span>
+          <input
+            className="admin-input"
+            value={texts[SITE_TEXT_KEYS.notFoundTitle] ?? ''}
+            onChange={(e) => setText(SITE_TEXT_KEYS.notFoundTitle, e.target.value)}
+            placeholder="这一页不在了"
+          />
+        </label>
+        <label className="admin-field">
+          <span className="admin-field__label">404 说明</span>
+          <input
+            className="admin-input"
+            value={texts[SITE_TEXT_KEYS.notFoundDesc] ?? ''}
+            onChange={(e) => setText(SITE_TEXT_KEYS.notFoundDesc, e.target.value)}
+            placeholder="可能是链接写错了…"
+          />
+        </label>
+      </div>
+
       <button className="btn btn--primary" onClick={save} disabled={!loaded}>保存设置</button>
     </div>
   );

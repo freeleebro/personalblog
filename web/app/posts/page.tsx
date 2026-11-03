@@ -5,7 +5,9 @@ import { Pagination } from '@/components/pagination';
 import { PostCard } from '@/components/post-card';
 import { TagChip } from '@/components/tag-chip';
 import { getPosts, getTags } from '@/lib/api';
+import { siteText, SITE_TEXT_KEYS } from '@/lib/site-text';
 import type { Post, Tag } from '@/lib/types';
+import { loadSite } from '../layout';
 
 export const metadata: Metadata = {
   title: '全部文章',
@@ -25,6 +27,8 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
     getPosts({ tag: tagSlug, page, perPage: PER_PAGE }),
     getTags(),
   ]);
+  const site = await loadSite().catch(() => null);
+  const lead = site?.texts?.[SITE_TEXT_KEYS.postsLead]?.trim() ?? '';
 
   const posts: Post[] = postsResult.status === 'fulfilled' ? postsResult.value.items : [];
   const meta =
@@ -47,10 +51,16 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
   return (
     <div className="shell page">
       <div className="page__head">
-        <h1 className="page__title">{activeTag ? `标签：${activeTag.name}` : '全部文章'}</h1>
+        <h1 className="page__title">
+          {activeTag ? `标签：${activeTag.name}` : siteText(site, SITE_TEXT_KEYS.postsTitle)}
+        </h1>
         <p className="page__desc">
-          共 {meta.total ?? posts.length} 篇
-          {tagSlug ? '，已按标签筛选。' : '，按发布时间倒序。'}
+          {lead || (
+            <>
+              共 {meta.total ?? posts.length} 篇
+              {tagSlug ? '，已按标签筛选。' : '，按发布时间倒序。'}
+            </>
+          )}
         </p>
       </div>
 
@@ -58,7 +68,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
         <div>
           {posts.length === 0 ? (
             <div className="panel" style={{ textAlign: 'center', padding: '40px 20px' }}>
-              <p style={{ margin: 0, fontWeight: 600 }}>这里还没有文章</p>
+              <p style={{ margin: 0, fontWeight: 600 }}>{siteText(site, SITE_TEXT_KEYS.postsEmpty)}</p>
               <p style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--fg-muted)' }}>
                 {tagSlug ? '换个标签看看，或者浏览全部文章。' : '后端服务可能还没启动。'}
               </p>
