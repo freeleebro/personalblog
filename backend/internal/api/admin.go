@@ -6,10 +6,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"hash/fnv"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/freeleebro/personalblog/backend/internal/auth"
 	"github.com/freeleebro/personalblog/backend/internal/domain"
@@ -222,13 +225,12 @@ func (s *Server) handleAdminSavePost(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "请求体非法")
 		return
 	}
-	if strings.TrimSpace(in.Slug) == "" {
-		writeError(w, http.StatusBadRequest, "bad_request", "slug 不能为空")
-		return
-	}
 	if strings.TrimSpace(in.Title) == "" {
 		writeError(w, http.StatusBadRequest, "bad_request", "标题不能为空")
 		return
+	}
+	if strings.TrimSpace(in.Slug) == "" {
+		in.Slug = postSlug(in.Title, time.Now())
 	}
 
 	authorID, err := s.defaultAuthorID(r)
@@ -304,7 +306,7 @@ func (s *Server) handleAdminSaveTag(w http.ResponseWriter, r *http.Request) {
 	}
 	slug := strings.TrimSpace(in.Slug)
 	if slug == "" {
-		slug = slugify(name)
+		slug = tagSlug(name)
 	}
 	if strings.TrimSpace(in.Color) == "" {
 		in.Color = "#8b5cf6"
@@ -452,8 +454,60 @@ const (
 	maxSiteTextLen = 500
 )
 
-// slugify 把中文/英文混合文本转成 URL 友好的 slug。
-func slugify(name string) string {
+// maxSlugLen 是自动生成 slug 的最大长度（字符数）。
+const maxSlugLen = 60
+
+// postSlug 把标题转成 URL 友好的 slug。
+// 纯 ASCII 标题压缩成 a-z0-9-；含中文等非 ASCII 字符时改用
+// post-YYYYMMDD-<6 位十六进制>，避免公开 URL 里出现 %E4%B8%AD 这种长转义。
+func postSlug(title string, now time.Time) string {
+	if s := asciiSlug(title); s != "" {
+		return s
+	}
+	sum := fnv.New32a()
+	_, _ = sum.Write([]byte(title))
+	return fmt.Sprintf("post-%s-%06x", now.Format("20060102"), sum.Sum32()&0xffffff)
+}
+
+// asciiSlug 只保留 a-z0-9，其余字符折叠成单个连字符。
+// 含非 ASCII 字符（中文、日文、全角标点等）时返回空串，交给调用方兜底。
+func asciiSlug(name string) string {
+	var b strings.Builder
+	pendingDash := false
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			if pendingDash && b.Len() > 0 {
+				b.WriteByte('-')
+			}
+			pendingDash = false
+			b.WriteRune(r)
+		case r >= 'A' && r <= 'Z':
+			if pendingDash && b.Len() > 0 {
+				b.WriteByte('-')
+			}
+			pendingDash = false
+			b.WriteRune(r + ('a' - 'A'))
+		case r > 127:
+			return ""
+		default:
+			// 空格、标点、符号都视作分隔符，连续多个折叠成一个连字符。
+			if b.Len() > 0 {
+				pendingDash = true
+			}
+		}
+	}
+	out := b.String()
+	if utf8.RuneCountInString(out) > maxSlugLen {
+		runes := []rune(out)
+		out = strings.TrimRight(string(runes[:maxSlugLen]), "-")
+	}
+	return out
+}
+
+// tagSlug 保留原有行为：中文标签直接作为 slug，便于 /tags/中文 这类可读 URL。
+// 标签数量少、URL 短，这里不追求 ASCII 化。
+func tagSlug(name string) string {
 	out := make([]rune, 0, len(name))
 	for _, r := range name {
 		switch {

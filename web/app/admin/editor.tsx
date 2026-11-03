@@ -210,14 +210,18 @@ export function AdminEditor({ onLogout }: { onLogout: () => void }) {
 
   async function handleSave() {
     if (!draft) return;
-    if (!draft.slug.trim() || !draft.title.trim()) {
-      setNotice('slug 和标题不能为空');
+    if (!draft.title.trim()) {
+      setNotice('标题不能为空');
+      return;
+    }
+    if (draft.id && !draft.slug.trim()) {
+      setNotice('修改已有文章时 slug 不能为空');
       return;
     }
     setSaving(true);
     setNotice('');
     try {
-      await adminApi.savePost({
+      const saved = await adminApi.savePost({
         slug: draft.slug,
         title: draft.title,
         summary: draft.summary,
@@ -229,7 +233,13 @@ export function AdminEditor({ onLogout }: { onLogout: () => void }) {
         tag_ids: draft.tag_ids,
         published_at: draft.published_at,
       });
-      setNotice('已保存 ✓');
+      if (!draft.slug.trim()) {
+        // 新文章留空 slug：由服务端按标题生成（中文标题会得到 post-日期-哈希）。
+        setDraft({ ...draft, id: saved.id, slug: saved.slug });
+        setNotice(`已保存 ✓ 自动生成的 URL：/posts/${saved.slug}`);
+      } else {
+        setNotice('已保存 ✓');
+      }
       await load();
     } catch (e) {
       setNotice(e instanceof Error ? e.message : '保存失败');
@@ -572,12 +582,12 @@ function PostEditor({
               />
             </label>
             <label className="admin-field">
-              <span className="admin-field__label">slug（URL 标识）</span>
+              <span className="admin-field__label">slug（URL 标识，留空自动生成）</span>
               <input
                 className="admin-input"
                 value={draft.slug}
                 onChange={(e) => onChange({ ...draft, slug: e.target.value })}
-                placeholder="my-post-slug"
+                placeholder="留空则按标题生成；中文标题得到 post-日期-随机串"
               />
             </label>
           </div>

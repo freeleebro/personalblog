@@ -81,6 +81,23 @@ docker compose down -v          # 停止并删除数据卷（彻底重置）
 
 改端口不要动 `docker-compose.yml`，在 `personal-blog/.env` 里覆盖即可（见下方环境变量）。
 
+### 发布与回滚
+
+本机改完代码后，在仓库根目录跑一条命令：
+
+```powershell
+pwsh scripts/release.ps1 -SshHost leebro
+```
+
+它负责打包（排除 `node_modules`、`.next`、`.env*`、本地数据库等）、上传，然后在服务器上执行
+`deploy.sh`：解包到 `.next` → 继承旧的 `.env.server` → 切换目录 → `docker compose up -d --build`
+→ 等容器 `healthy` 且首页 200。任何一步失败都会自动切回上一版并重新构建，
+全程日志在 `/var/log/beichuang-deploy.log`。
+
+手工发布也建议照同样顺序：解包到 `/opt/beichuang.next`、复制 `.env.server`、把旧目录改名
+`/opt/beichuang.old`、再构建，验证通过后再删旧目录。回滚就是把 `.old` 换回来（脚本失败时已自动做）；
+脚本还会把上一版镜像标记成 `beichuang:previous`，应急时可以用。
+
 备份要同时覆盖两个卷：数据库用 `pg_dump` 逻辑导出（比直接 tar 数据目录安全，还原时不会
 因为数据文件版本或半写状态出问题），图片卷打成 tar.gz。仓库里带了脚本：
 
@@ -125,6 +142,30 @@ docker run --rm --entrypoint tar -v beichuang_beichuang-media:/dst \
 front matter 的 `.md`、独立页面单独一个文件、上传过的图片在 `media/` 下、外加 `posts.json`。
 换服务器或者哪天不想用这套系统了，直接拿这个 zip 走人；解压后也能用编辑器的
 「导入 Markdown 文件」逐篇导回去。
+
+### 每日巡检（磁盘 / 内存 / 容器 / 备份新鲜度）
+
+```bash
+sudo install -m 644 docker/systemd/beichuang-watchdog.service /etc/systemd/system/
+sudo install -m 644 docker/systemd/beichuang-watchdog.timer   /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now beichuang-watchdog.timer
+journalctl -u beichuang-watchdog.service -n 20
+```
+
+每次检查四件事：根分区占用 ≥ 80%（`DISK_WARN`）、可用内存 < 150MB（`MEM_MIN_MB`）、
+`beichuang` 容器不是 `healthy`、最近一次数据库备份超过 8 天（`BACKUP_MAX_AGE_DAYS`）。
+有异常就写 journal 并返回非 0；想推到手机或群里，把 webhook 写进
+`/etc/default/beichuang-watchdog`：
+
+```bash
+sudo tee /etc/default/beichuang-watchdog >/dev/null <<'EOF'
+WEBHOOK_URL=https://example.com/webhook
+EOF
+```
+
+告警内容以 `{"text": "..."}` POST 出去，Slack、飞书机器人、自建接口都能直接收。
+手动触发一次告警验证链路：`DISK_WARN=1 sudo -E /opt/beichuang/scripts/watchdog.sh`（会返回 1）。
 
 > 反代与服务在同一台机器时，`5000` 端口只绑在 `127.0.0.1`；如需换端口，改 `docker-compose.yml` 里 `ports` 的 `published` 部分。
 
@@ -238,8 +279,13 @@ personal-blog/
 ├── Dockerfile                  # PostgreSQL + API + Next.js 单容器镜像
 ├── .env.example
 ├── docker/
-│   └── Caddyfile               # 反代 / TLS / 压缩 / 静态长缓存 / 安全头
+│   ├── Caddyfile               # 反代 / TLS / 压缩 / 静态长缓存 / 安全头
+│   └── systemd/                # backup / watchdog 的 service + timer
 ├── scripts/
+│   ├── deploy.sh               # 服务器端部署：原子切换 + 健康检查 + 失败自动回滚
+│   ├── release.ps1             # 本机一键发布：打包 → 上传 → 调用 deploy.sh
+│   ├── watchdog.sh             # 每日巡检：磁盘 / 内存 / 容器 / 备份新鲜度
+│   ├── backup.sh               # 数据库 + 媒体卷备份
 │   └── dev-postgres.py         # 免 Docker 的便携版 PostgreSQL
 ├── backend/                    # Go API
 │   ├── cmd/server/main.go      # 启动顺序：建库 → 连接 → 迁移 → HTTP
@@ -359,6 +405,11 @@ RSS、sitemap 里的统计视图）都带 `published_at <= now()`，后台编辑
 换 `ADMIN_SECRET` 会让所有旧 token 立即失效，这就是「强制下线」的开关。
 后台改密码时会往 `settings` 写一条 `admin_meta.password_updated_at`，
 启动检查据此跳过「环境变量密码与数据库不一致」的警告。
+
+**12. 中文标题不会生成 `%E4%B8%AD` 这种 URL。** 新建文章时 slug 可以留空：纯英文标题会
+压缩成 `hello-world`；只要标题里含中文（或全角标点），就改用 `post-20261103-a1b2c3`
+（日期 + 标题哈希），对搜索引擎和分享都更友好。想手写可读地址仍然可以直接填，
+比如 `ce-shi`。标签不同：标签量少、URL 短，`/tags/中文` 这种形式保留原样。
 
 ---
 

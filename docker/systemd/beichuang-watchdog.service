@@ -1,0 +1,12 @@
+[Unit]
+Description=beichuang 站点巡检（磁盘 / 内存 / 容器 / 备份）
+Documentation=https://github.com/freeleebro/personalblog
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/beichuang
+EnvironmentFile=-/etc/default/beichuang-watchdog
+ExecStart=/opt/beichuang/scripts/watchdog.sh
+Nice=10

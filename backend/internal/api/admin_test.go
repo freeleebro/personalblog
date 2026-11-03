@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestSanitizeTexts(t *testing.T) {
@@ -56,21 +57,64 @@ func TestSanitizeTextsCapsCount(t *testing.T) {
 	}
 }
 
-func TestSlugify(t *testing.T) {
-	// 这里锁定的是当前行为：ASCII 转小写、少数分隔符变连字符、中文原样保留。
-	// 如果以后给中文加拼音转换（T2.9），这几条断言会一起需要更新。
+func TestPostSlug(t *testing.T) {
+	// ASCII 标题走可读 slug；含非 ASCII 字符时退回 post-日期-哈希。
+	fixed := time.Date(2026, 11, 3, 10, 0, 0, 0, time.UTC)
 	cases := map[string]string{
-		"Hello World": "hello-world",
-		"a/b?c":       "a-b-c",
-		"C++ 入门":      "c-入门",
-		"个人博客":        "个人博客",
-		"":            "untitled",
-		// 连字符本身不在允许集合里，会被丢掉，于是整串变成空。
-		"---": "untitled",
+		"Hello World":  "hello-world",
+		"a/b?c":        "a-b-c",
+		"Hello  World": "hello-world", // 连续分隔符折叠成一个
+		"  Hello  ":    "hello",
+		"v1.2.3":       "v1-2-3",
 	}
 	for in, want := range cases {
-		if got := slugify(in); got != want {
-			t.Errorf("slugify(%q)=%q，期望 %q", in, got, want)
+		if got := postSlug(in, fixed); got != want {
+			t.Errorf("postSlug(%q)=%q，期望 %q", in, got, want)
+		}
+	}
+
+	// 中文 / 混合标题：前缀固定，后缀是 6 位十六进制。
+	for _, in := range []string{"C++ 入门", "个人博客", "", "---", "测试文章"} {
+		got := postSlug(in, fixed)
+		if !strings.HasPrefix(got, "post-20261103-") {
+			t.Errorf("postSlug(%q)=%q，期望 post-20261103- 前缀", in, got)
+			continue
+		}
+		suffix := strings.TrimPrefix(got, "post-20261103-")
+		if len(suffix) != 6 {
+			t.Errorf("postSlug(%q) 的哈希后缀应为 6 位，得到 %q", in, suffix)
+		}
+		if _, err := strconv.ParseUint(suffix, 16, 32); err != nil {
+			t.Errorf("postSlug(%q) 的后缀不是十六进制：%q", in, suffix)
+		}
+	}
+
+	// 同一个标题在同一天必须稳定，不能每次保存都换 URL。
+	if a, b := postSlug("中文标题", fixed), postSlug("中文标题", fixed); a != b {
+		t.Errorf("同一标题生成的 slug 不稳定：%q vs %q", a, b)
+	}
+	if a, b := postSlug("中文标题", fixed), postSlug("另一个标题", fixed); a == b {
+		t.Errorf("不同标题生成了相同 slug：%q", a)
+	}
+
+	// 超长 ASCII 标题要截断到 maxSlugLen。
+	long := strings.Repeat("abcdefghij", 10)
+	if got := postSlug(long, fixed); len([]rune(got)) > maxSlugLen {
+		t.Errorf("超长标题未截断：%d 字符", len([]rune(got)))
+	}
+}
+
+func TestTagSlugKeepsChinese(t *testing.T) {
+	// 标签沿用旧行为：中文保留，便于可读的 /tags/中文。
+	cases := map[string]string{
+		"Go":          "go",
+		"个人博客":        "个人博客",
+		"Hello World": "hello-world",
+		"":            "untitled",
+	}
+	for in, want := range cases {
+		if got := tagSlug(in); got != want {
+			t.Errorf("tagSlug(%q)=%q，期望 %q", in, got, want)
 		}
 	}
 }
