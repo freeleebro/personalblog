@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
-    "optimize-images": "node scripts/optimize-images.mjs"
+    "optimize-images": "node scripts/optimize-images.mjs",
+    "og-image": "node scripts/generate-og.mjs"
   },
   "dependencies": {
     "github-slugger": "^2.0.0",

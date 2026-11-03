@@ -156,6 +156,14 @@ cd web && npm run optimize-images
 
 脚本会用 `sharp` 生成 `anime-*-*.webp`，记得同步修改 `globals.css` 和 `page.tsx` 里的引用。
 
+分享卡片图（`og:image`，微信 / Twitter / Slack 抓取的那张）是 `web/public/og-image.jpg`（1200×630）。换底图后重新生成：
+
+```bash
+cd web && npm run og-image
+```
+
+文章如果在后台设置了封面图，分享卡片会优先用封面；没有封面才用这张默认图。
+
 ---
 
 ## 三、本地开发（热更新）
@@ -243,7 +251,7 @@ personal-blog/
     ├── components/             # 组件
     ├── lib/                    # API 客户端、格式化、TOC
     ├── public/                 # 图片等静态资源（Caddy 给长缓存）
-    └── scripts/                # optimize-images.mjs：插画压成 WebP
+    └── scripts/                # optimize-images.mjs：插画压 WebP；generate-og.mjs：生成分享卡片图
 ```
 
 ---

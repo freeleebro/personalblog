@@ -20,6 +20,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const { slug } = await params;
   try {
     const { post } = await getPost(slug);
+    // 有封面就用封面，没有就退回站点默认卡片图；相对路径由 metadataBase 补全成绝对地址。
+    const image = post.cover_url || '/og-image.jpg';
     return {
       title: post.title,
       description: post.summary,
@@ -29,6 +31,13 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
         description: post.summary,
         publishedTime: post.published_at ?? undefined,
         tags: post.tags.map((tag) => tag.name),
+        images: [{ url: image, width: 1200, height: 630, alt: post.title }],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: post.title,
+        description: post.summary,
+        images: [image],
       },
     };
   } catch {

@@ -54,6 +54,20 @@ export async function generateMetadata(): Promise<Metadata> {
       title: `${name} · ${tagline}`,
       description,
       locale: 'zh_CN',
+      images: [
+        {
+          url: '/og-image.jpg',
+          width: 1200,
+          height: 630,
+          alt: `${name} · ${tagline}`,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${name} · ${tagline}`,
+      description,
+      images: ['/og-image.jpg'],
     },
     alternates: {
       types: { 'application/rss+xml': '/feed.xml' },
