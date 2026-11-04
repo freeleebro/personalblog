@@ -145,10 +145,13 @@ func buildPostWhere(f PostFilter) (string, []any, int) {
 
 	if f.TagSlug != "" {
 		args = append(args, f.TagSlug)
+		// slug 与名称都匹配：`tag:go` 和 `tag:Go` 都能命中，中文标签也能直接
+		// 用名字搜（中文标签的 slug 与名字通常一致）。
 		conds = append(conds, fmt.Sprintf(`EXISTS (
             SELECT 1 FROM post_tags pt_f
             JOIN tags t_f ON t_f.id = pt_f.tag_id
-            WHERE pt_f.post_id = p.id AND t_f.slug = $%d)`, len(args)))
+            WHERE pt_f.post_id = p.id
+              AND (t_f.slug = $%[1]d OR lower(t_f.name) = lower($%[1]d)))`, len(args)))
 	}
 
 	if f.Query != "" {
