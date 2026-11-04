@@ -1,16 +1,38 @@
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 import { TagChip } from './tag-chip';
 import { IconClock } from './icons';
 import { compactNumber, formatDate, isoDate } from '@/lib/format';
 import type { Post } from '@/lib/types';
 
+/** 把关键词包成 <mark>，搜索结果里一眼能看到命中位置。 */
+function highlightText(text: string, keyword?: string): ReactNode {
+  const needle = keyword?.trim();
+  if (!needle) {
+    return text;
+  }
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
+  if (parts.length === 1) {
+    return text;
+  }
+  return parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <mark key={i} className="hl">
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  );
+}
+
 /**
  * 文章列表卡片。
  * index 用来在色块上显示序号，让列表有节奏感，也不依赖任何图片资源。
  */
-export function PostCard({ post, index }: { post: Post; index: number }) {
+export function PostCard({ post, index, highlight }: { post: Post; index: number; highlight?: string }) {
   return (
     <article className="post-card" style={{ '--cover': post.cover_color } as CSSProperties}>
       <div>
@@ -30,10 +52,12 @@ export function PostCard({ post, index }: { post: Post; index: number }) {
         </div>
 
         <h2 className="post-card__title">
-          <Link href={`/posts/${encodeURIComponent(post.slug)}`}>{post.title}</Link>
+          <Link href={`/posts/${encodeURIComponent(post.slug)}`}>
+            {highlightText(post.title, highlight)}
+          </Link>
         </h2>
 
-        <p className="post-card__excerpt">{post.summary}</p>
+        <p className="post-card__excerpt">{highlightText(post.summary, highlight)}</p>
 
         {post.tags.length > 0 ? (
           <div className="post-card__tags">

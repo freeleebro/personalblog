@@ -126,9 +126,10 @@ func escapeLike(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
-func buildPostWhere(f PostFilter) (string, []any) {
+func buildPostWhere(f PostFilter) (string, []any, int) {
 	args := make([]any, 0, 6)
 	conds := make([]string, 0, 6)
+	queryArg := 0
 
 	status := f.Status
 	if status == "" {
@@ -152,10 +153,11 @@ func buildPostWhere(f PostFilter) (string, []any) {
 
 	if f.Query != "" {
 		args = append(args, "%"+escapeLike(f.Query)+"%")
+		queryArg = len(args)
 		// 表达式必须与 0004 里的 gin 索引完全一致，否则用不上索引。
 		conds = append(conds, fmt.Sprintf(
 			`(coalesce(p.title, '') || ' ' || coalesce(p.summary, '') || ' ' || coalesce(p.body_md, ''))
-             ILIKE $%[1]d ESCAPE '\'`, len(args)))
+             ILIKE $%[1]d ESCAPE '\'`, queryArg))
 	}
 
 	if f.Year > 0 {
@@ -168,7 +170,7 @@ func buildPostWhere(f PostFilter) (string, []any) {
 		conds = append(conds, fmt.Sprintf("p.featured = $%d", len(args)))
 	}
 
-	return strings.Join(conds, " AND "), args
+	return strings.Join(conds, " AND "), args, queryArg
 }
 
 func clampInt(v, min, max, fallback int) int {
@@ -186,7 +188,7 @@ func clampInt(v, min, max, fallback int) int {
 
 // ListPosts 返回分页后的文章列表，附带总数。
 func (s *Store) ListPosts(ctx context.Context, f PostFilter) (*PostPage, error) {
-	where, args := buildPostWhere(f)
+	where, args, queryArg := buildPostWhere(f)
 	perPage := clampInt(f.PerPage, 1, 50, 10)
 	page := clampInt(f.Page, 1, 1_000_000, 1)
 
@@ -196,11 +198,26 @@ func (s *Store) ListPosts(ctx context.Context, f PostFilter) (*PostPage, error) 
 		return nil, fmt.Errorf("统计文章总数失败: %w", err)
 	}
 
+	// 有关键词时按「标题 > 摘要 > 正文」加权，再用 trigram 相似度做次级排序，
+	// 让「缓存」这种词优先落在标题里提到它的文章上。
+	orderBy := " ORDER BY p.published_at DESC NULLS LAST, p.id DESC"
+	if queryArg > 0 {
+		args = append(args, escapeLike(f.Query))
+		rawArg := len(args)
+		orderBy = fmt.Sprintf(` ORDER BY (
+			CASE WHEN p.title ILIKE $%[1]d ESCAPE '\' THEN 6 ELSE 0 END +
+			CASE WHEN p.summary ILIKE $%[1]d ESCAPE '\' THEN 3 ELSE 0 END +
+			CASE WHEN p.body_md ILIKE $%[1]d ESCAPE '\' THEN 1 ELSE 0 END +
+			similarity(p.title, $%[2]d) * 2 +
+			similarity(coalesce(p.summary, ''), $%[2]d)
+		) DESC, p.published_at DESC NULLS LAST, p.id DESC`, queryArg, rawArg)
+	}
+
 	listArgs := append(append([]any{}, args...), perPage, (page-1)*perPage)
 	sql := postSelect +
 		" WHERE " + where +
-		fmt.Sprintf(" ORDER BY p.published_at DESC NULLS LAST, p.id DESC LIMIT $%d OFFSET $%d",
-			len(args)+1, len(args)+2)
+		orderBy +
+		fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
 
 	rows, err := s.pool.Query(ctx, sql, listArgs...)
 	if err != nil {

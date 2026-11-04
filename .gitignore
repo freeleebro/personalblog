@@ -48,3 +48,7 @@ docs/OPTIMIZATION-PLAN.md
 skills-lock.json
 
 docs/OPTIMIZATION-FINAL.md
+
+# Playwright 产物
+web/test-results/
+web/playwright-report/

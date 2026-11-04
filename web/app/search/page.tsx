@@ -17,6 +17,9 @@ type SearchParams = Promise<{ q?: string }>;
 export default async function SearchPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
   const keyword = sp.q?.trim() ?? '';
+  // 搜索词里可以带 tag:xxx，标题里只展示真正用于高亮的关键词。
+  const displayKeyword = keyword.replace(/(?:^|\s)tag:\S+/g, ' ').trim();
+  const tagHint = /(?:^|\s)tag:(\S+)/.exec(keyword)?.[1] ?? '';
 
   let posts: Post[] = [];
   if (keyword) {
@@ -35,7 +38,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
         <h1 className="page__title">{siteText(site, SITE_TEXT_KEYS.searchTitle)}</h1>
         <p className="page__desc">
           {keyword
-            ? `关键词「${keyword}」，找到 ${posts.length} 篇文章。`
+            ? `${displayKeyword ? `关键词「${displayKeyword}」` : ''}${
+                tagHint ? `${displayKeyword ? ' · ' : ''}标签 #${tagHint}` : ''
+              }，找到 ${posts.length} 篇文章。`
             : siteText(site, SITE_TEXT_KEYS.searchLead)}
         </p>
       </div>
@@ -62,11 +67,14 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
           搜索
         </button>
       </form>
+      <p className="page__desc" style={{ marginTop: -14, marginBottom: 26, fontSize: 13 }}>
+        支持 <code>tag:标签</code> 语法，例如 <code>tag:go 缓存</code>。
+      </p>
 
       {posts.length > 0 ? (
         <div className="post-list">
           {posts.map((post, index) => (
-            <PostCard key={post.id} post={post} index={index} />
+            <PostCard key={post.id} post={post} index={index} highlight={displayKeyword} />
           ))}
         </div>
       ) : (

@@ -1,0 +1,51 @@
+# 依赖升级节奏：每周一统一开一批 PR，避免每天被单个补丁打断。
+#
+# 原则：
+# - 补丁/次要版本合并成一组（minor + patch），一次看完；
+# - 主版本单独开 PR（可能带 breaking change，要读 changelog）；
+# - GitHub Actions 与 Docker 基础镜像也一起盯着，但数量很少，不分组。
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(web)"
+    groups:
+      web-minor:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: gomod
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(go)"
+    groups:
+      go-minor:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "chore(ci)"
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "chore(docker)"

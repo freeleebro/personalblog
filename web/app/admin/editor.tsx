@@ -4,10 +4,10 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 
 import { adminApi } from '@/lib/admin-api';
 import { SITE_TEXT_KEYS } from '@/lib/site-text';
-import type { Comment, CommentCounts, Post, Tag } from '@/lib/types';
+import type { Comment, CommentCounts, Post, StatsSummary, Tag } from '@/lib/types';
 import { MarkdownPreview } from './markdown-preview';
 
-type Tab = 'posts' | 'comments' | 'tags' | 'about' | 'settings';
+type Tab = 'posts' | 'comments' | 'stats' | 'tags' | 'about' | 'settings';
 
 // 编辑中的文章草稿
 type Draft = {
@@ -302,6 +302,9 @@ export function AdminEditor({ onLogout }: { onLogout: () => void }) {
           <button className={`admin-tab${tab === 'comments' ? ' admin-tab--active' : ''}`} onClick={() => setTab('comments')}>
             评论
           </button>
+          <button className={`admin-tab${tab === 'stats' ? ' admin-tab--active' : ''}`} onClick={() => setTab('stats')}>
+            统计
+          </button>
           <button className={`admin-tab${tab === 'tags' ? ' admin-tab--active' : ''}`} onClick={() => setTab('tags')}>
             分类 / 标签
           </button>
@@ -395,6 +398,8 @@ export function AdminEditor({ onLogout }: { onLogout: () => void }) {
         </>
       ) : tab === 'comments' ? (
         <CommentsPanel />
+      ) : tab === 'stats' ? (
+        <StatsPanel />
       ) : tab === 'tags' ? (
         <TagsPanel tags={tags} onChanged={load} />
       ) : tab === 'about' ? (
@@ -1460,6 +1465,127 @@ function CommentsPanel() {
           ))}
         </ul>
       )}
+    </>
+  );
+}
+
+/** 访问统计：PV/UV 柱状图 + 热门页面/来源。数据只存 90 天，且不含 IP 原文。 */
+function StatsPanel() {
+  const [days, setDays] = useState(7);
+  const [data, setData] = useState<StatsSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setErr('');
+    adminApi
+      .getStats(days)
+      .then((d) => {
+        if (alive) setData(d);
+      })
+      .catch((e: unknown) => {
+        if (alive) setErr(e instanceof Error ? e.message : '读取统计失败');
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [days]);
+
+  const max = Math.max(1, ...(data?.daily.map((d) => d.pv) ?? [1]));
+
+  return (
+    <>
+      <div className="admin-page-intro">
+        <div>
+          <p className="admin-kicker">INSIGHTS / TRAFFIC</p>
+          <h1>访问统计</h1>
+          <p>只记录路径、来源站点和按天失效的访客哈希，不存 IP，也不写 cookie。</p>
+        </div>
+        <div className="admin-page-stats">
+          <strong>{data?.pv ?? 0}</strong><span>PV</span>
+          <strong>{data?.uv ?? 0}</strong><span>UV</span>
+          <strong>{data?.bots ?? 0}</strong><span>爬虫</span>
+        </div>
+      </div>
+
+      <div className="admin-quick-row">
+        {[7, 30].map((n) => (
+          <button
+            key={n}
+            className={`btn ${days === n ? 'btn--primary' : 'btn--ghost'}`}
+            onClick={() => setDays(n)}
+          >
+            最近 {n} 天
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <p className="admin-loading">加载中…</p>
+      ) : err ? (
+        <p className="admin-notice admin-notice--error">{err}</p>
+      ) : data ? (
+        <>
+          <div className="admin-stats-bars" role="img" aria-label={`最近 ${data.days} 天访问量`}>
+            {data.daily.map((d) => (
+              <div
+                key={d.date}
+                className="admin-stats-bar"
+                title={`${d.date}：${d.pv} PV / ${d.uv} UV`}
+              >
+                <span
+                  className="admin-stats-bar__fill"
+                  style={{ height: `${Math.max(3, Math.round((d.pv / max) * 100))}%` }}
+                />
+                <span className="admin-stats-bar__label">{d.date.slice(5)}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="admin-stats-grid">
+            <section className="admin-stats-card">
+              <h2>热门页面</h2>
+              {data.top_pages.length === 0 ? (
+                <p className="admin-empty">还没有访问记录。</p>
+              ) : (
+                <ul className="admin-stats-list">
+                  {data.top_pages.map((p) => (
+                    <li key={p.name}>
+                      <span className="admin-stats-list__name">{p.name}</span>
+                      <span className="admin-stats-list__count">{p.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="admin-stats-card">
+              <h2>来源站点</h2>
+              {data.top_referrers.length === 0 ? (
+                <p className="admin-empty">没有站外来源，或大家都是直接访问。</p>
+              ) : (
+                <ul className="admin-stats-list">
+                  {data.top_referrers.map((p) => (
+                    <li key={p.name}>
+                      <span className="admin-stats-list__name">{p.name}</span>
+                      <span className="admin-stats-list__count">{p.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+
+          <p className="admin-hint">
+            访问记录保留 90 天，超过后自动清理；UV 按「IP + UA + 日期」哈希计算，跨天无法关联到同一个人。
+          </p>
+        </>
+      ) : null}
     </>
   );
 }

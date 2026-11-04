@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 
 import './globals.css';
 
+import { Analytics } from '@/components/analytics';
 import { MobileNav } from '@/components/nav-links';
 import { Particles } from '@/components/particles';
 import { BackToTop } from '@/components/reading-progress';
@@ -118,6 +119,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <SiteFooter site={site} />
         <MobileNav />
         <BackToTop />
+        <Analytics />
       </body>
     </html>
   );

@@ -3,7 +3,7 @@
 // 管理后台的 API 客户端。所有写操作都带 Bearer token。
 // token 存在 localStorage，由调用方（登录后）注入。
 
-import type { Comment, CommentCounts, Page, Post, Site, Tag } from './types';
+import type { Comment, CommentCounts, Page, Post, Site, StatsSummary, Tag } from './types';
 
 // 管理后台走同源代理 /api-proxy，避免跨域，也不把后端地址暴露给浏览器。
 const ADMIN_BASE = '/api-proxy';
@@ -58,12 +58,14 @@ async function adminRequest<T>(path: string, init?: RequestInit): Promise<T> {
     throw new AdminError(`无法连接后端（${ADMIN_BASE}）`, 503);
   }
 
-  if (res.status === 401) {
-    throw new AdminError('登录已过期，请重新登录', 401);
-  }
-
   const body = await res.json().catch(() => null);
   if (!res.ok) {
+    // 登录接口的 401 是「密码错误」，不是「登录已过期」；
+    // 只有带了 token 的请求才把它翻译成过期提示。
+    const isLogin = path === '/admin/login';
+    if (res.status === 401 && !isLogin) {
+      throw new AdminError('登录已过期，请重新登录', 401);
+    }
     const msg = (body as { error?: { message?: string } })?.error?.message ?? `请求失败（${res.status}）`;
     throw new AdminError(msg, res.status);
   }
@@ -195,6 +197,9 @@ export const adminApi = {
     }),
   deleteComment: (id: number) =>
     adminRequest<{ deleted: boolean }>(`/admin/comments/${id}`, { method: 'DELETE' }),
+
+  /** 访问统计：最近 N 天的 PV/UV、热门页面与来源。 */
+  getStats: (days = 7) => adminRequest<StatsSummary>(`/admin/stats?days=${days}`),
 
   listTags: () => adminRequest<Tag[]>('/tags'),
   saveTag: (tag: { slug: string; name: string; color: string; description: string }) =>

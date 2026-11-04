@@ -123,12 +123,41 @@ func (s *Server) handleSite(w http.ResponseWriter, r *http.Request) {
 
 // ---------------------------------------------------------------- 文章
 
+// splitTagQuery 从搜索词里拆出 "tag:xxx" 过滤条件。
+// 例如 "tag:go 缓存" 返回 ("缓存", "go")；没有 tag: 时标签为空。
+func splitTagQuery(raw string) (string, string) {
+	fields := strings.Fields(raw)
+	if len(fields) == 0 {
+		return "", ""
+	}
+	kept := make([]string, 0, len(fields))
+	tag := ""
+	for _, field := range fields {
+		if strings.HasPrefix(field, "tag:") {
+			value := strings.TrimPrefix(field, "tag:")
+			if value != "" && tag == "" {
+				tag = value
+			}
+			continue
+		}
+		kept = append(kept, field)
+	}
+	return strings.Join(kept, " "), tag
+}
+
 func (s *Server) handleListPosts(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
+	// 支持在搜索框里直接写 "tag:go 缓存"：标签当过滤条件，剩下的才是关键词。
+	query, tagFromQuery := splitTagQuery(strings.TrimSpace(q.Get("q")))
+	tagSlug := strings.TrimSpace(q.Get("tag"))
+	if tagSlug == "" {
+		tagSlug = tagFromQuery
+	}
+
 	filter := store.PostFilter{
-		TagSlug: strings.TrimSpace(q.Get("tag")),
-		Query:   strings.TrimSpace(q.Get("q")),
+		TagSlug: tagSlug,
+		Query:   query,
 		Year:    intOrDefault(q.Get("year"), 0),
 		Page:    intOrDefault(q.Get("page"), 1),
 		PerPage: intOrDefault(q.Get("per_page"), 10),

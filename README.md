@@ -252,6 +252,21 @@ bash scripts/dev.sh logs api # 跟踪某个服务的日志
 > 解压到 `.devdb/`）。它不带 `psql` / `createdb`，所以后端内置了 `AUTO_CREATE_DATABASE`：
 > 连不上目标库时自动 `CREATE DATABASE`，省掉手工建库。
 
+### 测试
+
+```bash
+cd backend && go test ./... -count=1     # Go 单元测试
+cd web && npm run typecheck              # TypeScript 类型检查
+cd web && npm run test:e2e               # Playwright 端到端（自动拉起假后端 + next dev）
+```
+
+e2e 不连数据库：`web/e2e/mock-api.mjs` 提供一个内存版假后端，`playwright.config.ts` 里同时
+拉起它和 `next dev`。首次运行需要 `npx playwright install chromium`。
+CI（`.github/workflows/ci.yml`）会跑同样的命令，失败时把 HTML 报告作为 artifact 上传。
+
+依赖升级交给 `.github/dependabot.yml`：npm 与 Go 每周一检查，minor/patch 合并成一个 PR；
+Actions 与 Docker 每月一次。合并前至少等 CI 绿，`next` 大版本先看一遍迁移指南。
+
 ### 管理后台导入 Markdown
 
 打开 `http://localhost:3000/admin` 后，文章工作台支持直接导入 `.md` / `.markdown` 文件。
@@ -318,9 +333,10 @@ personal-blog/
 | --- | --- | --- |
 | GET | `/api/v1/health` | 健康检查（compose 的 healthcheck 就靠它） |
 | GET | `/api/v1/site` | 站点设置 + 作者信息 |
-| GET | `/api/v1/posts` | 文章列表，支持 `?q=` 模糊搜索、`?tag=`、`?page=`、`?per_page=` |
+| GET | `/api/v1/posts` | 文章列表，支持 `?q=`（可写 `tag:go 缓存`）、`?tag=`、`?page=`、`?per_page=`；有关键词时按标题/摘要/正文相关度排序 |
 | GET | `/api/v1/posts/{slug}` | 文章详情（含上下篇） |
 | GET | `/api/v1/posts/{slug}/related` | 相关文章 |
+| POST | `/api/v1/collect` | 访问统计打点（前台 `sendBeacon`，只收 path 与来源 host） |
 | GET | `/api/v1/posts/{slug}/comments` | 公开评论列表（待审的不会出现） |
 | POST | `/api/v1/posts/{slug}/comments` | 提交评论（蜜罐 + 每 IP 10 分钟 5 条） |
 | POST | `/api/v1/posts/{slug}/views` | 浏览量 +1 |
@@ -353,6 +369,7 @@ personal-blog/
 | GET | `/api/v1/admin/comments` | 评论列表，`?status=pending\|published\|hidden`，附带三态计数 |
 | PUT | `/api/v1/admin/comments/{id}` | 改评论状态（`{status}`） |
 | DELETE | `/api/v1/admin/comments/{id}` | 删除评论 |
+| GET | `/api/v1/admin/stats` | 访问统计，`?days=7\|30\|90`：PV/UV/爬虫、按天曲线、Top 页面与来源 |
 | POST/PUT | `/api/v1/admin/tags` / `.../{slug}` | 创建/更新标签 |
 | DELETE | `/api/v1/admin/tags/{slug}` | 删除标签 |
 | POST | `/api/v1/admin/pages` | 创建/更新独立页面 |
@@ -426,6 +443,17 @@ RSS、sitemap 里的统计视图）都带 `published_at <= now()`，后台编辑
 `sha256(ip|ADMIN_SECRET)` 前 16 位，用于排障和反垃圾，不能反查。新评论默认进 `pending`，
 后台「评论」标签页通过后才公开；想改成即时显示设 `COMMENT_AUTO_APPROVE=true`。
 评论用 `post_slug` 关联而不是外键：文章删了，评论留着也不会报错。
+
+**14. 访问统计自己算，不装 Umami。** 2 GB 的机器上再加一个 Umami 容器 + 独立数据库不划算。
+这里只多一张 `page_views` 表：前台在生产环境用 `navigator.sendBeacon` 打一个
+`POST /api/v1/collect`，只带 path 和 referrer 的 host；后端过滤常见爬虫 UA、按
+`sha256(ip|ua|日期|ADMIN_SECRET)` 前 16 位算 UV 去重，最多保留 90 天。后台「统计」标签页
+看 7/30 天 PV/UV、按天柱状图和 Top 页面/来源。没有第三方脚本，也就没有额外的前端阻塞。
+
+**15. 搜索用 `pg_trgm` 做相关度，不自建中文分词。** 数据量在几十到几百篇时，分词器
+（jieba、zhparser）带来的安装与词典维护成本远大于收益。`0008_search_trgm.sql` 给
+`title`/`summary` 建 trigram 索引，查询按「标题命中 > 摘要命中 > 正文命中 + `similarity()`
+加权」排序；搜索结果里用 `<mark>` 高亮，另支持 `tag:go 缓存` 这种限定标签的写法。
 
 ---
 

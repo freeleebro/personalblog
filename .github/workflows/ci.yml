@@ -68,3 +68,38 @@ jobs:
       - name: 构建
         # 页面全是动态渲染，构建时不需要后端在跑。
         run: npm run build
+
+  e2e:
+    name: 端到端（Playwright）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 安装 Chromium
+        # e2e 只跑 chromium；--with-deps 装上系统库（CI 镜像里没有）。
+        run: npx playwright install --with-deps chromium
+
+      - name: 运行 e2e
+        # 假后端 + next dev 都由 playwright.config.ts 的 webServer 拉起，
+        # 不需要 Postgres 或 Go 进程。
+        run: npm run test:e2e
+
+      - name: 失败时保存报告
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web/playwright-report
+          retention-days: 7

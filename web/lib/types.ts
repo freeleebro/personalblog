@@ -119,3 +119,24 @@ export type CommentCounts = {
   published: number;
   hidden: number;
 };
+
+export type StatsPoint = {
+  date: string;
+  pv: number;
+  uv: number;
+};
+
+export type StatsItem = {
+  name: string;
+  count: number;
+};
+
+export type StatsSummary = {
+  days: number;
+  pv: number;
+  uv: number;
+  bots: number;
+  daily: StatsPoint[];
+  top_pages: StatsItem[];
+  top_referrers: StatsItem[];
+};

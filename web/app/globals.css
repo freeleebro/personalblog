@@ -547,3 +547,12 @@ kbd { padding: 2px 5px; border: 1px solid var(--border-strong); border-radius: 4
   .comment-form__row { grid-template-columns: 1fr; }
   .comments { margin-top: 46px; }
 }
+
+/* 搜索结果里的关键词高亮 */
+.hl {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+  color: inherit;
+  font-weight: 600;
+}

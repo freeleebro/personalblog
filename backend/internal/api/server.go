@@ -60,6 +60,10 @@ func (s *Server) Handler() http.Handler {
 	// ---- 配图：写要鉴权，读是公开的静态文件 ----
 	mux.HandleFunc("GET /media/{path...}", s.handleMedia)
 
+	// ---- 访问统计：收集是公开旁路接口，汇总只在后台 ----
+	mux.Handle("POST /api/v1/collect",
+		middleware.RateLimit(120, time.Minute)(http.HandlerFunc(s.handleCollect)))
+
 	// ---- 草稿预览：先校验签名，通过后返回任意状态的文章 ----
 	mux.HandleFunc("GET /api/v1/preview/{slug}", s.handlePreview)
 
@@ -84,6 +88,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/admin/uploads", auth(s.handleAdminUpload))
 	mux.HandleFunc("GET /api/v1/admin/preview/{slug}", auth(s.handleAdminPreviewLink))
 	mux.HandleFunc("GET /api/v1/admin/export", auth(s.handleAdminExport))
+	mux.HandleFunc("GET /api/v1/admin/stats", auth(s.handleAdminStats))
 
 	// 评论审核：列表、通过/隐藏、删除。
 	mux.HandleFunc("GET /api/v1/admin/comments", auth(s.handleAdminListComments))
