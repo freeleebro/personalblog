@@ -119,6 +119,13 @@ jobs:
         with:
           context: .
           push: false
-          # 只验证能构建；不 load 到本地，省掉导出时间。
+          # 需要 load 到本地，下一步才能在镜像里跑 node 冒烟。
+          load: true
+          tags: beichuang:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: 冒烟：镜像里的 node 能启动
+        # 踩过的坑：node 二进制是从 node:alpine 拷进 postgres:alpine 的，
+        # 新版本 node 多了 libatomic 依赖，缺了运行时才炸，而 build 阶段看起来一切正常。
+        run: docker run --rm beichuang:ci node -v

@@ -22,7 +22,10 @@ RUN npm run build
 
 # ---------- PostgreSQL + Go API + Next.js in one container ----------
 FROM postgres:17-alpine
-RUN apk add --no-cache wget su-exec
+# libatomic：从 node:alpine 拷过来的 node 二进制依赖它（Node 24+ 起），
+# postgres 镜像里没有；缺了它 node 只在运行时才会报 "Error loading shared library"，
+# docker build 本身不会失败，所以 CI 里还要跑一次 `node -v` 冒烟。
+RUN apk add --no-cache wget su-exec libatomic
 COPY --from=web-builder /usr/local/bin/node /usr/local/bin/node
 COPY --from=api-builder /out/server /usr/local/bin/beichuang-api
 COPY --from=web-builder /src/web/public /app/web/public
