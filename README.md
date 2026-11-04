@@ -143,6 +143,47 @@ front matter 的 `.md`、独立页面单独一个文件、上传过的图片在 
 换服务器或者哪天不想用这套系统了，直接拿这个 zip 走人；解压后也能用编辑器的
 「导入 Markdown 文件」逐篇导回去。
 
+### 升级 PostgreSQL 大版本（例如 17 → 18）
+
+数据库大版本不能像小版本那样改个镜像 tag 就重启：PG 的数据目录格式在跨大版本时**不兼容**，
+18 直接挂 17 卷会拒绝启动（或更糟，把卷标成需要恢复）。正确做法是「逻辑导出 → 新卷 → 导入」，
+我们每天的备份正好就是这个形态，所以成本不高。
+
+```bash
+# 1. 先做一份最新的完整备份（数据库 + 图片）
+sudo /opt/beichuang/scripts/backup.sh
+ls -lh /var/backups/beichuang | tail -2      # 记下 dump 文件名
+
+# 2. 停掉服务（此时站点不可用，通常 5~10 分钟）
+cd /opt/beichuang && docker compose down
+
+# 3. 改版本：docker-compose.yml 和 Dockerfile 里的 postgres:17-alpine → postgres:18-alpine
+#    同时把数据卷换成新名字，避免 18 碰到 17 的旧数据目录，例如
+#    beichuang-data → beichuang-data18
+
+# 4. 构建并只起数据库，让 18 初始化空库
+docker compose up -d --build beichuang
+docker exec beichuang pg_isready -U blog
+
+# 5. 灌回数据（dump 带 --clean，会先删同名对象）
+gunzip -c /var/backups/beichuang/beichuang-db-XXXXXXXXTXXXXXX.sql.gz \
+  | docker exec -i beichuang psql -U blog -d beichuang
+
+# 6. 验数：迁移记录和内容条目都对得上，再确认首页 200
+docker exec beichuang psql -U blog -d beichuang -c 'select count(*) from posts; select count(*) from schema_migrations;'
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1/
+```
+
+要点：
+
+- **别原地升级**：直接让 18 挂 17 的卷是最常见的翻车方式，卷一旦被 18 打开过，回退到 17 就需要
+  从备份重来。
+- **回滚**：旧镜像还在（发布脚本会把上一版标成 `beichuang:previous`），把 compose 里的版本和卷
+  名改回 17、`docker compose up -d --build` 即可；旧卷没动过，数据还在。
+- **磁盘**：解压后的 SQL 大约是 dump 的 3~5 倍，导入前确认根分区有余量（`df -h /`）。
+- **升级后重建索引**：导入完成跑一次 `ANALYZE;` 让 18 的统计信息生效，前台列表页会更快进入状态。
+- 图片卷（`beichuang_beichuang-media`）和数据库版本无关，不用动。
+
 ### 每日巡检（磁盘 / 内存 / 容器 / 备份新鲜度）
 
 ```bash

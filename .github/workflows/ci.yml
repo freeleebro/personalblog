@@ -6,15 +6,13 @@ on:
   pull_request:
   workflow_dispatch:
 
-# 同一个分支只保留最新一次运行，省掉排队的构建。
-concurrency:
+# 鍚屼竴涓垎鏀彧淇濈暀鏈€鏂颁竴娆¤繍琛岋紝鐪佹帀鎺掗槦鐨勬瀯寤恒€?concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   backend:
-    name: 后端（Go）
-    runs-on: ubuntu-latest
+    name: 鍚庣锛圙o锛?    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
@@ -26,11 +24,10 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
-      - name: 格式检查
-        run: |
+      - name: 鏍煎紡妫€鏌?        run: |
           unformatted=$(gofmt -l .)
           if [ -n "$unformatted" ]; then
-            echo "以下文件没有 gofmt："
+            echo "浠ヤ笅鏂囦欢娌℃湁 gofmt锛?
             echo "$unformatted"
             exit 1
           fi
@@ -38,15 +35,14 @@ jobs:
       - name: go vet
         run: go vet ./...
 
-      - name: 单元测试
+      - name: 鍗曞厓娴嬭瘯
         run: go test ./... -race -count=1
 
-      - name: 编译
+      - name: 缂栬瘧
         run: go build ./cmd/server
 
   web:
-    name: 前端（Next.js）
-    runs-on: ubuntu-latest
+    name: 鍓嶇锛圢ext.js锛?    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: web
@@ -55,23 +51,20 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: 安装依赖
+      - name: 瀹夎渚濊禆
         run: npm ci
 
-      - name: 类型检查
-        run: npm run typecheck
+      - name: 绫诲瀷妫€鏌?        run: npm run typecheck
 
-      - name: 构建
-        # 页面全是动态渲染，构建时不需要后端在跑。
-        run: npm run build
+      - name: 鏋勫缓
+        # 椤甸潰鍏ㄦ槸鍔ㄦ€佹覆鏌擄紝鏋勫缓鏃朵笉闇€瑕佸悗绔湪璺戙€?        run: npm run build
 
   e2e:
-    name: 端到端（Playwright）
-    runs-on: ubuntu-latest
+    name: 绔埌绔紙Playwright锛?    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: web
@@ -80,24 +73,20 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: 安装依赖
+      - name: 瀹夎渚濊禆
         run: npm ci
 
-      - name: 安装 Chromium
-        # e2e 只跑 chromium；--with-deps 装上系统库（CI 镜像里没有）。
-        run: npx playwright install --with-deps chromium
+      - name: 瀹夎 Chromium
+        # e2e 鍙窇 chromium锛?-with-deps 瑁呬笂绯荤粺搴擄紙CI 闀滃儚閲屾病鏈夛級銆?        run: npx playwright install --with-deps chromium
 
-      - name: 运行 e2e
-        # 假后端 + next dev 都由 playwright.config.ts 的 webServer 拉起，
-        # 不需要 Postgres 或 Go 进程。
-        run: npm run test:e2e
+      - name: 杩愯 e2e
+        # 鍋囧悗绔?+ next dev 閮界敱 playwright.config.ts 鐨?webServer 鎷夎捣锛?        # 涓嶉渶瑕?Postgres 鎴?Go 杩涚▼銆?        run: npm run test:e2e
 
-      - name: 失败时保存报告
-        if: failure()
+      - name: 澶辫触鏃朵繚瀛樻姤鍛?        if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
@@ -105,20 +94,17 @@ jobs:
           retention-days: 7
 
   docker:
-    name: 镜像构建（Docker）
-    # 上面三个 job 只验证源码；这个 job 验证 Dockerfile 本身能构建，
-    # 这样 dependabot 提基础镜像升级（Go / Node / Postgres）时 CI 才有意义。
-    runs-on: ubuntu-latest
+    name: 闀滃儚鏋勫缓锛圖ocker锛?    # 涓婇潰涓変釜 job 鍙獙璇佹簮鐮侊紱杩欎釜 job 楠岃瘉 Dockerfile 鏈韩鑳芥瀯寤猴紝
+    # 杩欐牱 dependabot 鎻愬熀纭€闀滃儚鍗囩骇锛圙o / Node / Postgres锛夋椂 CI 鎵嶆湁鎰忎箟銆?    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: 构建生产镜像
+      - name: 鏋勫缓鐢熶骇闀滃儚
         uses: docker/build-push-action@v6
         with:
           context: .
           push: false
-          # 只验证能构建；不 load 到本地，省掉导出时间。
-          cache-from: type=gha
+          # 鍙獙璇佽兘鏋勫缓锛涗笉 load 鍒版湰鍦帮紝鐪佹帀瀵煎嚭鏃堕棿銆?          cache-from: type=gha
           cache-to: type=gha,mode=max
