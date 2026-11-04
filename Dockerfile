@@ -21,7 +21,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # ---------- PostgreSQL + Go API + Next.js in one container ----------
-FROM postgres:17-alpine
+FROM postgres:18-alpine
 RUN apk add --no-cache wget su-exec
 COPY --from=web-builder /usr/local/bin/node /usr/local/bin/node
 COPY --from=api-builder /out/server /usr/local/bin/beichuang-api
