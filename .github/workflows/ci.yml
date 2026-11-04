@@ -128,4 +128,5 @@ jobs:
       - name: 冒烟：镜像里的 node 能启动
         # 踩过的坑：node 二进制是从 node:alpine 拷进 postgres:alpine 的，
         # 新版本 node 多了 libatomic 依赖，缺了运行时才炸，而 build 阶段看起来一切正常。
-        run: docker run --rm beichuang:ci node -v
+        # 必须覆盖 entrypoint：镜像默认入口会拉起 Postgres/API/Next 并常驻，不会退出。
+        run: docker run --rm --entrypoint node beichuang:ci -v
