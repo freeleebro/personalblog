@@ -163,6 +163,12 @@ func (in *adminPostInput) toStore(authorID *int64) (store.PostInput, error) {
 		}
 		publishedAt = &t
 	}
+	// 状态是 published 又没给时间，就按「现在」发布。否则 published_at 为 NULL，
+	// 前台按「已到发布时间」过滤时这篇文章会直接消失（后台列表里却还在）。
+	if status == "published" && publishedAt == nil {
+		now := time.Now()
+		publishedAt = &now
+	}
 
 	coverURL := strings.TrimSpace(in.CoverURL)
 	if coverURL != "" && !strings.HasPrefix(coverURL, "/") && !strings.HasPrefix(coverURL, "https://") {
@@ -329,6 +335,10 @@ func (s *Server) handleAdminSaveTag(w http.ResponseWriter, r *http.Request) {
 // handleAdminDeleteTag 删除标签（关联的文章标签会级联清除）。
 func (s *Server) handleAdminDeleteTag(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.DeleteTag(r.Context(), r.PathValue("slug")); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not_found", "标签不存在")
+			return
+		}
 		s.fail(w, "删除标签失败", err)
 		return
 	}
@@ -368,6 +378,10 @@ func (s *Server) handleAdminSavePage(w http.ResponseWriter, r *http.Request) {
 // handleAdminDeletePage 删除独立页面。
 func (s *Server) handleAdminDeletePage(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.DeletePage(r.Context(), r.PathValue("slug")); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not_found", "页面不存在")
+			return
+		}
 		s.fail(w, "删除页面失败", err)
 		return
 	}
