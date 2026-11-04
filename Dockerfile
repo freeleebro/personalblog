@@ -1,5 +1,5 @@
 # ---------- Go API ----------
-FROM golang:1.26-alpine AS api-builder
+FROM golang:1.27-alpine AS api-builder
 WORKDIR /src/backend
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
