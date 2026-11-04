@@ -118,3 +118,36 @@ func TestTagSlugKeepsChinese(t *testing.T) {
 		}
 	}
 }
+
+func TestPostInputPublishedAtDefaults(t *testing.T) {
+	// published 但没给时间：必须补成当前时间，否则前台按发布时间过滤会看不到。
+	in := adminPostInput{Title: "x", Slug: "x", Status: "published"}
+	out, err := in.toStore(nil)
+	if err != nil {
+		t.Fatalf("toStore 报错：%v", err)
+	}
+	if out.PublishedAt == nil {
+		t.Fatal("published 状态没有补 published_at")
+	}
+
+	// draft 不该自动带发布时间。
+	in = adminPostInput{Title: "x", Slug: "x", Status: "draft"}
+	out, err = in.toStore(nil)
+	if err != nil {
+		t.Fatalf("toStore 报错：%v", err)
+	}
+	if out.PublishedAt != nil {
+		t.Fatal("draft 不应该有 published_at")
+	}
+
+	// 显式时间要原样保留（定时发布靠它）。
+	at := "2027-01-01T09:00:00+08:00"
+	in = adminPostInput{Title: "x", Slug: "x", Status: "published", Published: &at}
+	out, err = in.toStore(nil)
+	if err != nil {
+		t.Fatalf("toStore 报错：%v", err)
+	}
+	if out.PublishedAt == nil || out.PublishedAt.Format(time.RFC3339) != "2027-01-01T09:00:00+08:00" {
+		t.Fatalf("显式发布时间被改写：%v", out.PublishedAt)
+	}
+}

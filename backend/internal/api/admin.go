@@ -163,6 +163,12 @@ func (in *adminPostInput) toStore(authorID *int64) (store.PostInput, error) {
 		}
 		publishedAt = &t
 	}
+	// 状态是 published 又没给时间，就按「现在」发布。否则 published_at 为 NULL，
+	// 前台按「已到发布时间」过滤时这篇文章会直接消失（后台列表里却还在）。
+	if status == "published" && publishedAt == nil {
+		now := time.Now()
+		publishedAt = &now
+	}
 
 	coverURL := strings.TrimSpace(in.CoverURL)
 	if coverURL != "" && !strings.HasPrefix(coverURL, "/") && !strings.HasPrefix(coverURL, "https://") {
