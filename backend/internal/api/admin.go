@@ -329,6 +329,10 @@ func (s *Server) handleAdminSaveTag(w http.ResponseWriter, r *http.Request) {
 // handleAdminDeleteTag 删除标签（关联的文章标签会级联清除）。
 func (s *Server) handleAdminDeleteTag(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.DeleteTag(r.Context(), r.PathValue("slug")); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not_found", "标签不存在")
+			return
+		}
 		s.fail(w, "删除标签失败", err)
 		return
 	}
@@ -368,6 +372,10 @@ func (s *Server) handleAdminSavePage(w http.ResponseWriter, r *http.Request) {
 // handleAdminDeletePage 删除独立页面。
 func (s *Server) handleAdminDeletePage(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.DeletePage(r.Context(), r.PathValue("slug")); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not_found", "页面不存在")
+			return
+		}
 		s.fail(w, "删除页面失败", err)
 		return
 	}
