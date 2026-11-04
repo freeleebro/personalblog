@@ -103,3 +103,22 @@ jobs:
           name: playwright-report
           path: web/playwright-report
           retention-days: 7
+
+  docker:
+    name: 镜像构建（Docker）
+    # 上面三个 job 只验证源码；这个 job 验证 Dockerfile 本身能构建，
+    # 这样 dependabot 提基础镜像升级（Go / Node / Postgres）时 CI 才有意义。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: 构建生产镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          # 只验证能构建；不 load 到本地，省掉导出时间。
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
