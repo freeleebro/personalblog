@@ -34,9 +34,45 @@ export type Post = {
   views: number;
   author?: Author;
   tags: Tag[];
+  /** 所属系列；缺省表示不属于任何系列 */
+  series?: SeriesRef | null;
+  /** 系列内阅读序号，0 表示未指定（按发布时间排） */
+  series_order: number;
   published_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+/** 挂在文章上的系列摘要，只够渲染「本文是《X》的第 N 篇」。 */
+export type SeriesRef = {
+  id: number;
+  slug: string;
+  title: string;
+};
+
+/** 系列 / 合集：一组有固定阅读顺序的文章。 */
+export type Series = {
+  id: number;
+  slug: string;
+  title: string;
+  description: string;
+  post_count: number;
+  posts?: Post[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type SeriesDetail = {
+  series: Series;
+  posts: Post[];
+};
+
+/** 友情链接。与 Social 分开：Social 是自己的账号，友链是别人的站。 */
+export type FriendLink = {
+  name: string;
+  url: string;
+  description?: string;
+  avatar?: string;
 };
 
 export type Page = {
@@ -65,6 +101,8 @@ export type Site = {
   url: string;
   author: Author | null;
   socials: Social[] | null;
+  /** 友链；后端保证是数组（站长没填时为空数组） */
+  links: FriendLink[];
   // 后台「站点设置」里可编辑的短文案，键名见 lib/site-text.ts。
   texts?: Record<string, string>;
   stats: Stats;

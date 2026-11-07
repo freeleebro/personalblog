@@ -12,6 +12,17 @@ export function SiteFooter({ site }: { site: Site | null }) {
       <div className="shell site-footer__inner">
         <span>
           © {year} {name}
+          <span className="site-footer__license">
+            内容采用{' '}
+            <a
+              href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans"
+              target="_blank"
+              rel="noopener noreferrer license"
+            >
+              CC BY-NC-SA 4.0
+            </a>{' '}
+            许可
+          </span>
         </span>
 
         <span className="site-footer__links">
@@ -24,6 +35,9 @@ export function SiteFooter({ site }: { site: Site | null }) {
               {social.label}
             </a>
           ))}
+          <Link href="/now">Now</Link>
+          <Link href="/links">友链</Link>
+          <a href="/feed.xml">RSS</a>
           <Link href="/about">关于</Link>
         </span>
       </div>

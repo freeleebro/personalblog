@@ -6,6 +6,8 @@ import type {
   Page,
   Post,
   PostDetail,
+  Series,
+  SeriesDetail,
   Site,
   Tag,
   TagDetail,
@@ -122,6 +124,18 @@ export async function getArchive(): Promise<ArchiveYear[]> {
   const res = await request<ArchiveYear[]>('/api/v1/archive');
   return res.data ?? [];
 }
+
+/** 系列列表。后端只返回「至少有一篇已发布文章」的系列。 */
+export const getSeriesList = cache(async (): Promise<Series[]> => {
+  const res = await request<Series[]>('/api/v1/series');
+  return res.data ?? [];
+});
+
+/** 系列详情：含简介与按阅读顺序排好的文章。 */
+export const getSeries = cache(
+  async (slug: string): Promise<SeriesDetail> =>
+    (await request<SeriesDetail>(`/api/v1/series/${encodeURIComponent(slug)}`)).data,
+);
 
 /**
  * 草稿预览：后端校验签名和有效期后才返回内容。

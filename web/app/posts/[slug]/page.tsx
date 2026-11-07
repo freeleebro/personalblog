@@ -3,17 +3,20 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { ReadingProgress } from '@/components/reading-progress';
+import { ArticleLicense } from '@/components/article-license';
 import { Comments } from '@/components/comments';
 import { Markdown } from '@/components/markdown';
 import { PostCard } from '@/components/post-card';
+import { SeriesBanner, SeriesDirectory } from '@/components/series-nav';
 import { TableOfContents } from '@/components/table-of-contents';
 import { TagChip } from '@/components/tag-chip';
 import { ViewCounter } from '@/components/view-counter';
 import { IconArrowLeft, IconCalendar, IconClock } from '@/components/icons';
-import { ApiError, getPost, getRelated } from '@/lib/api';
+import { ApiError, getPost, getRelated, getSeries } from '@/lib/api';
 import { formatDate, isoDate } from '@/lib/format';
 import { buildToc } from '@/lib/toc';
-import type { Post } from '@/lib/types';
+import type { Post, SeriesDetail } from '@/lib/types';
+import { loadSite } from '../../layout';
 
 type Params = Promise<{ slug: string }>;
 
@@ -73,6 +76,22 @@ export default async function PostPage({ params }: { params: Params }) {
     related = [];
   }
 
+  // 属于某个系列时，把整条系列取回来：既要知道「第几篇」，
+  // 也要在文末列目录。失败就退化成不显示，不能因为系列挂了整篇文章 500。
+  let seriesDetail: SeriesDetail | null = null;
+  if (post.series) {
+    try {
+      seriesDetail = await getSeries(post.series.slug);
+    } catch {
+      seriesDetail = null;
+    }
+  }
+  const seriesIndex = seriesDetail
+    ? seriesDetail.posts.findIndex((item) => item.slug === post.slug)
+    : -1;
+
+  const site = await loadSite().catch(() => null);
+
   return (
     <>
       <ReadingProgress />
@@ -83,6 +102,15 @@ export default async function PostPage({ params }: { params: Params }) {
             <IconArrowLeft width={14} height={14} />
             返回文章列表
           </Link>
+
+          {post.series ? (
+            <SeriesBanner
+              slug={post.series.slug}
+              title={post.series.title}
+              index={seriesIndex}
+              total={seriesDetail?.posts.length ?? 0}
+            />
+          ) : null}
 
           <h1 className="article-title">{post.title}</h1>
 
@@ -115,6 +143,15 @@ export default async function PostPage({ params }: { params: Params }) {
             <article>
               <Markdown>{body}</Markdown>
 
+              {post.series && seriesDetail ? (
+                <SeriesDirectory
+                  slug={post.series.slug}
+                  title={post.series.title}
+                  posts={seriesDetail.posts}
+                  currentSlug={post.slug}
+                />
+              ) : null}
+
               <nav className="post-nav">
                 {prev ? (
                   <Link href={`/posts/${encodeURIComponent(prev.slug)}`} className="post-nav__item">
@@ -137,6 +174,8 @@ export default async function PostPage({ params }: { params: Params }) {
                   <span className="post-nav__spacer">已经是最后一篇</span>
                 )}
               </nav>
+
+              <ArticleLicense post={post} site={site} />
 
               <Comments slug={post.slug} />
 

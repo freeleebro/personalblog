@@ -29,11 +29,12 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------- 站点
 
 type siteSettings struct {
-	Name        string          `json:"name"`
-	Tagline     string          `json:"tagline"`
-	Description string          `json:"description"`
-	URL         string          `json:"url"`
-	Socials     []domain.Social `json:"socials"`
+	Name        string              `json:"name"`
+	Tagline     string              `json:"tagline"`
+	Description string              `json:"description"`
+	URL         string              `json:"url"`
+	Socials     []domain.Social     `json:"socials"`
+	Links       []domain.FriendLink `json:"links"`
 
 	// Texts 是页面上那些「编辑想改、但不值得单独建表」的短文案。
 	// 用扁平的 key/value 存，新增一句文案只要前后端各加一个 key，
@@ -60,6 +61,11 @@ func (s *Server) handleSite(w http.ResponseWriter, r *http.Request) {
 	}
 	if cfg.Texts == nil {
 		cfg.Texts = map[string]string{}
+	}
+	// 友链默认留空：站长没填时前台显示空状态，而不是 null，
+	// 免得前端到处写 `site.links ?? []`。
+	if cfg.Links == nil {
+		cfg.Links = []domain.FriendLink{}
 	}
 
 	authorSlug := s.cfg.AuthorSlug
@@ -113,6 +119,7 @@ func (s *Server) handleSite(w http.ResponseWriter, r *http.Request) {
 		URL:         cfg.URL,
 		Author:      author,
 		Socials:     cfg.Socials,
+		Links:       cfg.Links,
 		Texts:       cfg.Texts,
 		Stats:       stats,
 		Tags:        tags,
@@ -314,6 +321,37 @@ func (s *Server) handleGetTag(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeData(w, tagDetail{Tag: *tag, Posts: posts.Items}, nil)
+}
+
+// ---------------------------------------------------------------- 系列 / 合集
+
+// handleListSeries 返回系列列表。只返回有已发布文章的系列，
+// 空系列留给后台自己看，前台不展示「点进去什么都没有」的入口。
+func (s *Server) handleListSeries(w http.ResponseWriter, r *http.Request) {
+	items, err := s.store.ListSeries(r.Context(), true)
+	if err != nil {
+		s.fail(w, "查询系列列表失败", err)
+		return
+	}
+	writeData(w, items, nil)
+}
+
+type seriesDetail struct {
+	Series domain.Series `json:"series"`
+	Posts  []domain.Post `json:"posts"`
+}
+
+func (s *Server) handleGetSeries(w http.ResponseWriter, r *http.Request) {
+	series, posts, err := s.store.GetSeriesBySlug(r.Context(), r.PathValue("slug"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "series_not_found", "系列不存在")
+		return
+	}
+	if err != nil {
+		s.fail(w, "查询系列失败", err)
+		return
+	}
+	writeData(w, seriesDetail{Series: *series, Posts: posts}, nil)
 }
 
 // ---------------------------------------------------------------- 归档 / 页面

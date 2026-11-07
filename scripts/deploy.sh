@@ -9,6 +9,7 @@
 #   - 运行期配置 .env.server 不进源码包，部署时从当前线上目录继承
 #   - 旧版本目录保留到新版本健康检查通过；失败则切回去并重新构建
 #   - 日志追加到 /var/log/beichuang-deploy.log
+#   - 成功后清理悬空镜像与构建缓存，避免磁盘被反复构建撑满
 #
 # 由 scripts/release.ps1 在本机调用（打包 → 上传 → 执行本脚本）。
 
@@ -47,11 +48,6 @@ tar -xzf "$TARBALL" -C "$NEXT"
 
 cp -a "$ROOT/.env.server" "$NEXT/.env.server"
 chmod 600 "$NEXT/.env.server"
-
-if docker image inspect beichuang-beichuang >/dev/null 2>&1; then
-  docker image tag beichuang-beichuang beichuang:previous >/dev/null
-  log "已把当前镜像标记为 beichuang:previous"
-fi
 
 rollback() {
   log "部署失败，开始回滚"
@@ -94,4 +90,12 @@ while :; do
 done
 
 rm -rf "$OLD"
+
+# 每次部署会留下一个 700MB 的悬空旧镜像，三阶段构建还会往 build cache 里
+# 堆 node_modules（实测 4 次构建攒了 4.8GB，把 30G 盘吃到 39%）。这里收尾。
+log "清理悬空镜像与构建缓存"
+docker image prune -f >>"$LOG_FILE" 2>&1 || log "警告：悬空镜像清理失败（不影响线上）"
+docker builder prune -f --keep-storage 2GB >>"$LOG_FILE" 2>&1 || log "警告：构建缓存清理失败（不影响线上）"
+log "当前磁盘：$(df -h / | awk 'NR==2 {print $3"/"$2" ("$5")"}')"
+
 log "==== 部署成功 ===="

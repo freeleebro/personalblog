@@ -259,3 +259,46 @@
 @media (max-width: 720px) {
   .admin-stats-grid { grid-template-columns: 1fr; }
 }
+
+/* 系列 / 合集：标签表单是「名称 + 颜色 + 简介 + 按钮」四列，系列只有三列 */
+.admin-series-add { grid-template-columns: minmax(140px, 1fr) minmax(200px, 1.6fr) auto auto; }
+.admin-series-list { display: grid; gap: 10px; margin: 22px 0 0; padding: 0; list-style: none; }
+.admin-series-item { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elev); }
+.admin-series-item__title { font-size: 14px; font-weight: 700; }
+.admin-series-item__slug { color: var(--accent-2); font-family: var(--font-mono); font-size: 11px; }
+.admin-series-item__desc { flex: 1 1 240px; min-width: 0; color: var(--fg-muted); font-size: 12px; overflow-wrap: anywhere; }
+.admin-series-item__count { color: var(--fg-subtle); font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; }
+.admin-series-item__actions { display: flex; gap: 8px; margin-left: auto; }
+.admin-series-item__actions .admin-btn-ghost { min-height: 30px; padding: 0 10px; font-size: 12px; }
+.admin-series-item__actions .admin-post-item__del { flex: none; width: 30px; height: 30px; }
+
+/* 文章编辑器里的「系列 + 序号」一行 */
+.admin-inline-row { display: flex; align-items: center; gap: 10px; }
+.admin-inline-row .admin-input { flex: 1 1 auto; min-width: 0; }
+.admin-input--narrow { flex: 0 0 104px; width: 104px; text-align: center; }
+.admin-inline-row__suffix { color: var(--fg-subtle); font-size: 12px; white-space: nowrap; }
+
+/* 页面类内容的 about / now 切换 */
+.admin-page-switch { margin-bottom: 18px; }
+
+/* 友链编辑 */
+.admin-link-list { display: grid; gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
+.admin-link-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(160px, 1.6fr) minmax(150px, 1.4fr) minmax(130px, 1.2fr) 34px;
+  gap: 8px;
+  align-items: center;
+}
+.admin-link-row .admin-input { min-height: 36px; font-size: 12px; }
+.admin-link-row .admin-post-item__del { flex: none; width: 34px; height: 36px; }
+.admin-link-add { margin-top: 12px; }
+
+@media (max-width: 720px) {
+  .admin-series-add { grid-template-columns: 1fr 1fr; }
+  .admin-series-add .btn { grid-column: 1 / -1; }
+  .admin-inline-row { flex-wrap: wrap; }
+  .admin-input--narrow { flex: 0 0 84px; width: 84px; }
+  .admin-link-row { grid-template-columns: 1fr 34px; }
+  .admin-link-row .admin-input { grid-column: 1 / 2; }
+  .admin-link-row .admin-post-item__del { grid-column: 2 / 3; grid-row: 1 / 5; align-self: center; }
+}

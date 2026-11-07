@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 
-import { getPosts, getTags } from '@/lib/api';
+import { getPosts, getSeriesList, getTags } from '@/lib/api';
 import { loadSite } from './layout';
 
 export const dynamic = 'force-dynamic';
@@ -12,13 +12,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticEntries: MetadataRoute.Sitemap = [
     { url: `${base}/`, changeFrequency: 'daily', priority: 1 },
     { url: `${base}/posts`, changeFrequency: 'daily', priority: 0.9 },
+    { url: `${base}/series`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${base}/tags`, changeFrequency: 'weekly', priority: 0.7 },
     { url: `${base}/archive`, changeFrequency: 'weekly', priority: 0.6 },
+    { url: `${base}/now`, changeFrequency: 'weekly', priority: 0.6 },
+    { url: `${base}/links`, changeFrequency: 'monthly', priority: 0.4 },
     { url: `${base}/about`, changeFrequency: 'monthly', priority: 0.5 },
   ];
 
   try {
-    const [{ items: posts }, tags] = await Promise.all([getPosts({ perPage: 50 }), getTags()]);
+    const [{ items: posts }, tags, series] = await Promise.all([
+      getPosts({ perPage: 50 }),
+      getTags(),
+      getSeriesList(),
+    ]);
 
     return [
       ...staticEntries,
@@ -32,6 +39,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         url: `${base}/tags/${encodeURIComponent(tag.slug)}`,
         changeFrequency: 'weekly' as const,
         priority: 0.5,
+      })),
+      ...series.map((item) => ({
+        url: `${base}/series/${encodeURIComponent(item.slug)}`,
+        lastModified: new Date(item.updated_at),
+        changeFrequency: 'weekly' as const,
+        priority: 0.6,
       })),
     ];
   } catch {

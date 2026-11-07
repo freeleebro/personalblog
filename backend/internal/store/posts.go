@@ -15,14 +15,18 @@ import (
 
 // postSelect 是所有文章查询共用的投影。
 // 标签用 LATERAL + json_agg 一次性聚合成 JSON，避免 N+1 查询。
+// 系列只取 id/slug/title 三个字段：渲染「本文属于《X》，第 N 篇」够用了，
+// 完整成员列表走 GetSeriesBySlug。
 const postSelect = `
 SELECT
     p.id, p.slug, p.title, p.summary, p.body_md, p.cover_color, p.cover_url, p.status,
     p.featured, p.reading_minutes, p.views, p.published_at, p.created_at, p.updated_at,
     a.id, a.slug, a.name, a.avatar_url, a.bio,
-    COALESCE(agg.tags, '[]'::json) AS tags
+    COALESCE(agg.tags, '[]'::json) AS tags,
+    p.series_order, sr.id, sr.slug, sr.title
 FROM posts p
 LEFT JOIN authors a ON a.id = p.author_id
+LEFT JOIN series sr ON sr.id = p.series_id
 LEFT JOIN LATERAL (
     SELECT json_agg(
                json_build_object(
@@ -52,6 +56,9 @@ func scanPost(row rowScanner) (*domain.Post, error) {
 		aAvatar  *string
 		aBio     *string
 		tagsJSON []byte
+		sID      *int64
+		sSlug    *string
+		sTitle   *string
 	)
 
 	if err := row.Scan(
@@ -59,6 +66,7 @@ func scanPost(row rowScanner) (*domain.Post, error) {
 		&p.Featured, &p.ReadingMinutes, &p.Views, &p.PublishedAt, &p.CreatedAt, &p.UpdatedAt,
 		&aID, &aSlug, &aName, &aAvatar, &aBio,
 		&tagsJSON,
+		&p.SeriesOrder, &sID, &sSlug, &sTitle,
 	); err != nil {
 		return nil, err
 	}
@@ -70,6 +78,13 @@ func scanPost(row rowScanner) (*domain.Post, error) {
 			Name:      deref(aName),
 			AvatarURL: deref(aAvatar),
 			Bio:       deref(aBio),
+		}
+	}
+	if sID != nil {
+		p.Series = &domain.SeriesRef{
+			ID:    *sID,
+			Slug:  deref(sSlug),
+			Title: deref(sTitle),
 		}
 	}
 	if len(tagsJSON) > 0 {

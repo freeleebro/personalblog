@@ -51,6 +51,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/tags", s.handleListTags)
 	mux.HandleFunc("GET /api/v1/tags/{slug}", s.handleGetTag)
 
+	// ---- 系列/合集：只读公开接口，写入在后台 ----
+	mux.HandleFunc("GET /api/v1/series", s.handleListSeries)
+	mux.HandleFunc("GET /api/v1/series/{slug}", s.handleGetSeries)
+
 	mux.HandleFunc("GET /api/v1/archive", s.handleArchive)
 	mux.HandleFunc("GET /api/v1/pages/{slug}", s.handleGetPage)
 
@@ -98,6 +102,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/admin/tags", auth(s.handleAdminSaveTag))
 	mux.HandleFunc("PUT /api/v1/admin/tags/{slug}", auth(s.handleAdminSaveTag))
 	mux.HandleFunc("DELETE /api/v1/admin/tags/{slug}", auth(s.handleAdminDeleteTag))
+
+	mux.HandleFunc("GET /api/v1/admin/series", auth(s.handleAdminListSeries))
+	mux.HandleFunc("POST /api/v1/admin/series", auth(s.handleAdminSaveSeries))
+	mux.HandleFunc("PUT /api/v1/admin/series/{slug}", auth(s.handleAdminSaveSeries))
+	mux.HandleFunc("DELETE /api/v1/admin/series/{slug}", auth(s.handleAdminDeleteSeries))
 
 	mux.HandleFunc("POST /api/v1/admin/pages", auth(s.handleAdminSavePage))
 	mux.HandleFunc("DELETE /api/v1/admin/pages/{slug}", auth(s.handleAdminDeletePage))

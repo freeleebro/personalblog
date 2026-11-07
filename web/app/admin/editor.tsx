@@ -4,10 +4,10 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 
 import { adminApi } from '@/lib/admin-api';
 import { SITE_TEXT_KEYS } from '@/lib/site-text';
-import type { Comment, CommentCounts, Post, StatsSummary, Tag } from '@/lib/types';
+import type { Comment, CommentCounts, Post, Series, StatsSummary, Tag } from '@/lib/types';
 import { MarkdownPreview } from './markdown-preview';
 
-type Tab = 'posts' | 'comments' | 'stats' | 'tags' | 'about' | 'settings';
+type Tab = 'posts' | 'comments' | 'stats' | 'tags' | 'series' | 'about' | 'settings';
 
 // 编辑中的文章草稿
 type Draft = {
@@ -21,6 +21,8 @@ type Draft = {
   status: string;
   featured: boolean;
   tag_ids: number[];
+  series_id: number | null;
+  series_order: number;
   published_at: string | null;
 };
 
@@ -34,6 +36,8 @@ const EMPTY_DRAFT: Draft = {
   status: 'draft',
   featured: false,
   tag_ids: [],
+  series_id: null,
+  series_order: 0,
   published_at: null,
 };
 
@@ -182,6 +186,7 @@ export function AdminEditor({ onLogout }: { onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('posts');
   const [posts, setPosts] = useState<Post[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [series, setSeries] = useState<Series[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -194,9 +199,14 @@ export function AdminEditor({ onLogout }: { onLogout: () => void }) {
     setLoading(true);
     setError('');
     try {
-      const [p, t] = await Promise.all([adminApi.listPosts(), adminApi.listTags()]);
+      const [p, t, s] = await Promise.all([
+        adminApi.listPosts(),
+        adminApi.listTags(),
+        adminApi.listSeries(),
+      ]);
       setPosts(p);
       setTags(t);
+      setSeries(s);
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败');
     } finally {
@@ -231,6 +241,8 @@ export function AdminEditor({ onLogout }: { onLogout: () => void }) {
         status: draft.status,
         featured: draft.featured,
         tag_ids: draft.tag_ids,
+        series_id: draft.series_id,
+        series_order: draft.series_order,
         published_at: draft.published_at,
       });
       if (!draft.slug.trim()) {
@@ -278,6 +290,8 @@ export function AdminEditor({ onLogout }: { onLogout: () => void }) {
         status: p.status,
         featured: p.featured,
         tag_ids: p.tags.map((t) => t.id),
+        series_id: p.series?.id ?? null,
+        series_order: p.series_order ?? 0,
         published_at: p.published_at,
       });
     } catch (e) {
@@ -308,8 +322,11 @@ export function AdminEditor({ onLogout }: { onLogout: () => void }) {
           <button className={`admin-tab${tab === 'tags' ? ' admin-tab--active' : ''}`} onClick={() => setTab('tags')}>
             分类 / 标签
           </button>
+          <button className={`admin-tab${tab === 'series' ? ' admin-tab--active' : ''}`} onClick={() => setTab('series')}>
+            系列
+          </button>
           <button className={`admin-tab${tab === 'about' ? ' admin-tab--active' : ''}`} onClick={() => setTab('about')}>
-            关于页面
+            页面
           </button>
           <button className={`admin-tab${tab === 'settings' ? ' admin-tab--active' : ''}`} onClick={() => setTab('settings')}>
             站点设置
@@ -382,6 +399,7 @@ export function AdminEditor({ onLogout }: { onLogout: () => void }) {
             <PostEditor
               draft={draft}
               tags={tags}
+              series={series}
               onChange={setDraft}
               onSave={handleSave}
               saving={saving}
@@ -402,8 +420,10 @@ export function AdminEditor({ onLogout }: { onLogout: () => void }) {
         <StatsPanel />
       ) : tab === 'tags' ? (
         <TagsPanel tags={tags} onChanged={load} />
+      ) : tab === 'series' ? (
+        <SeriesPanel series={series} onChanged={load} />
       ) : tab === 'about' ? (
-        <AboutPanel />
+        <PagesPanel />
       ) : (
         <SettingsPanel />
       )}
@@ -416,6 +436,7 @@ export function AdminEditor({ onLogout }: { onLogout: () => void }) {
 function PostEditor({
   draft,
   tags,
+  series,
   onChange,
   onSave,
   saving,
@@ -423,6 +444,7 @@ function PostEditor({
 }: {
   draft: Draft;
   tags: Tag[];
+  series: Series[];
   onChange: (d: Draft) => void;
   onSave: () => void;
   saving: boolean;
@@ -746,6 +768,42 @@ function PostEditor({
           </div>
 
           <div className="admin-field">
+            <span className="admin-field__label">系列（可选）</span>
+            <span className="admin-field__hint">
+              归到某个合集里，读者就能按顺序从头读。序号留 0 表示按发布时间排。
+            </span>
+            <div className="admin-inline-row">
+              <select
+                className="admin-input"
+                value={draft.series_id ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    ...draft,
+                    series_id: e.target.value ? Number(e.target.value) : null,
+                  })
+                }
+              >
+                <option value="">不属于任何系列</option>
+                {series.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title}（{s.post_count} 篇）
+                  </option>
+                ))}
+              </select>
+              <input
+                className="admin-input admin-input--narrow"
+                type="number"
+                min={0}
+                value={draft.series_order}
+                disabled={draft.series_id === null}
+                onChange={(e) => onChange({ ...draft, series_order: Number(e.target.value) || 0 })}
+                placeholder="序号"
+                title="系列内阅读序号"
+              />
+            </div>
+          </div>
+
+          <div className="admin-field">
             <span className="admin-field__label">正文（Markdown）</span>
             <div className="admin-import-row">
               <label className="admin-import-button">
@@ -858,10 +916,151 @@ function TagsPanel({ tags, onChanged }: { tags: Tag[]; onChanged: () => void }) 
   );
 }
 
-// ---------------------------------------------------------------- 关于页面
+// ---------------------------------------------------------------- 系列面板
 
-function AboutPanel() {
-  const [title, setTitle] = useState('关于');
+function SeriesPanel({ series, onChanged }: { series: Series[]; onChanged: () => void }) {
+  const [title, setTitle] = useState('');
+  const [desc, setDesc] = useState('');
+  const [editingSlug, setEditingSlug] = useState('');
+  const [msg, setMsg] = useState('');
+
+  async function save() {
+    if (!title.trim()) {
+      setMsg('系列名不能为空');
+      return;
+    }
+    try {
+      // 新建时 slug 留空由服务端生成；编辑时带上原 slug，改标题也不会换 URL。
+      await adminApi.saveSeries({ slug: editingSlug, title: title.trim(), description: desc.trim() });
+      setTitle('');
+      setDesc('');
+      setEditingSlug('');
+      setMsg('已保存');
+      onChanged();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '保存失败');
+    }
+  }
+
+  function startEdit(item: Series) {
+    setEditingSlug(item.slug);
+    setTitle(item.title);
+    setDesc(item.description);
+    setMsg('');
+  }
+
+  async function del(slug: string) {
+    if (!confirm(`删除系列「${slug}」？文章不会被删除，只是不再归属这个系列。`)) return;
+    try {
+      await adminApi.deleteSeries(slug);
+      if (editingSlug === slug) {
+        setEditingSlug('');
+        setTitle('');
+        setDesc('');
+      }
+      setMsg('已删除');
+      onChanged();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '删除失败');
+    }
+  }
+
+  return (
+    <div className="admin-panel">
+      <h2 className="admin-section-title">系列 / 合集</h2>
+      {msg ? <p className="admin-notice">{msg}</p> : null}
+      <p className="admin-hint">
+        把连载或长文拆成一组，读者可以按顺序从头读。系列有固定顺序，标签没有——
+        所以这里单独建表，而不是用标签代替。
+      </p>
+
+      <div className="admin-tag-add admin-series-add">
+        <input
+          className="admin-input"
+          placeholder="系列名"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <input
+          className="admin-input"
+          placeholder="一句话简介（可选）"
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+        />
+        <button className="btn btn--primary" onClick={save}>
+          {editingSlug ? '保存修改' : '添加'}
+        </button>
+        {editingSlug ? (
+          <button
+            className="btn btn--ghost"
+            onClick={() => {
+              setEditingSlug('');
+              setTitle('');
+              setDesc('');
+            }}
+          >
+            取消
+          </button>
+        ) : null}
+      </div>
+
+      {series.length === 0 ? (
+        <p className="admin-empty">还没有系列。建一个，然后在文章编辑器里把文章放进去。</p>
+      ) : (
+        <ul className="admin-series-list">
+          {series.map((s) => (
+            <li key={s.id} className="admin-series-item">
+              <span className="admin-series-item__title">{s.title}</span>
+              <span className="admin-series-item__slug">{s.slug}</span>
+              <span className="admin-series-item__count">{s.post_count} 篇</span>
+              {s.description ? (
+                <span className="admin-series-item__desc">{s.description}</span>
+              ) : null}
+              <div className="admin-series-item__actions">
+                <button className="admin-btn-ghost" onClick={() => startEdit(s)}>
+                  编辑
+                </button>
+                <button className="admin-post-item__del" onClick={() => del(s.slug)}>
+                  ✕
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- 页面（关于 / Now）
+
+// 可以在后台编辑的独立页面。新增一页只要在这里加一条 + 建对应路由。
+const EDITABLE_PAGES = [
+  {
+    slug: 'about',
+    label: '关于',
+    kicker: 'ABOUT / PROFILE',
+    hint: '介绍你自己、关注的方向和联系方式。正文支持完整 Markdown。',
+    defaultTitle: '关于',
+    placeholder: '# 关于我\n\n介绍一下你自己、正在做的事情，以及这个博客记录什么。',
+    href: '/about',
+  },
+  {
+    slug: 'now',
+    label: 'Now',
+    kicker: 'NOW / SNAPSHOT',
+    hint: '此刻在做什么、在读什么。这一页记录当下，不是履历——记得常回来改。',
+    defaultTitle: 'Now',
+    placeholder: '# 现在\n\n- 在做：\n- 在读：\n- 在学：',
+    href: '/now',
+  },
+] as const;
+
+function PagesPanel() {
+  const [slug, setSlug] = useState<string>('about');
+  const page = EDITABLE_PAGES.find((item) => item.slug === slug) ?? EDITABLE_PAGES[0];
+
+  const [title, setTitle] = useState<string>(page.defaultTitle);
   const [body, setBody] = useState('');
   const [preview, setPreview] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -869,27 +1068,42 @@ function AboutPanel() {
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setMsg('');
+    setPreview(false);
     (async () => {
       try {
-        const page = await adminApi.getPage('about');
-        setTitle(page.title);
-        setBody(page.body_md);
-      } catch (e) {
-        setMsg(e instanceof Error ? e.message : '加载关于页面失败');
+        const data = await adminApi.getPage(slug);
+        if (cancelled) return;
+        setTitle(data.title);
+        setBody(data.body_md);
+      } catch {
+        // 404 表示这一页还没建，属正常状态：给一份空白底稿，保存即创建。
+        if (cancelled) return;
+        setTitle(page.defaultTitle);
+        setBody('');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, page.defaultTitle]);
 
   async function save() {
     setSaving(true);
     setMsg('');
     try {
-      await adminApi.savePage({ slug: 'about', title: title.trim() || '关于', body_md: body });
-      setMsg('关于页面已保存，前台会立即更新');
+      await adminApi.savePage({
+        slug,
+        title: title.trim() || page.defaultTitle,
+        body_md: body,
+      });
+      setMsg(`${page.label}页面已保存，前台会立即更新`);
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : '保存关于页面失败');
+      setMsg(e instanceof Error ? e.message : '保存失败');
     } finally {
       setSaving(false);
     }
@@ -899,11 +1113,25 @@ function AboutPanel() {
     <div className="admin-panel admin-about-panel">
       <div className="admin-panel-heading">
         <div>
-          <p className="admin-kicker">ABOUT / PROFILE</p>
-          <h2 className="admin-section-title">关于页面</h2>
-          <p className="admin-hint">介绍你自己、关注的方向和联系方式。正文支持完整 Markdown。</p>
+          <p className="admin-kicker">{page.kicker}</p>
+          <h2 className="admin-section-title">{page.label}页面</h2>
+          <p className="admin-hint">{page.hint}</p>
         </div>
-        <a className="admin-link" href="/about" target="_blank" rel="noreferrer">打开前台 ↗</a>
+        <a className="admin-link" href={page.href} target="_blank" rel="noreferrer">
+          打开前台 ↗
+        </a>
+      </div>
+
+      <div className="admin-editor__mode admin-page-switch">
+        {EDITABLE_PAGES.map((item) => (
+          <button
+            key={item.slug}
+            className={`admin-tab${item.slug === slug ? ' admin-tab--active' : ''}`}
+            onClick={() => setSlug(item.slug)}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
       {msg ? <p className="admin-notice">{msg}</p> : null}
@@ -928,13 +1156,13 @@ function AboutPanel() {
               </button>
             </div>
             <button className="btn btn--primary" onClick={save} disabled={saving}>
-              {saving ? '保存中…' : '保存关于页'}
+              {saving ? '保存中…' : `保存${page.label}页`}
             </button>
           </div>
 
           {preview ? (
             <div className="admin-about-preview">
-              <h1 className="admin-preview-title">{title || '关于'}</h1>
+              <h1 className="admin-preview-title">{title || page.defaultTitle}</h1>
               <MarkdownPreview>{body}</MarkdownPreview>
             </div>
           ) : (
@@ -942,7 +1170,7 @@ function AboutPanel() {
               className="admin-input admin-textarea admin-about-textarea"
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder={'# 关于我\n\n介绍一下你自己、正在做的事情，以及这个博客记录什么。'}
+              placeholder={page.placeholder}
             />
           )}
         </>
@@ -960,6 +1188,12 @@ function SettingsPanel() {
   const [url, setUrl] = useState('');
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [notesEnabled, setNotesEnabled] = useState(false);
+  // 友链在后台维护；socials 这一版暂时没有编辑界面，但要原样带回，
+  // 否则保存一次站点设置就会把它们清空。
+  const [socials, setSocials] = useState<{ label: string; url: string }[]>([]);
+  const [links, setLinks] = useState<
+    { name: string; url: string; description: string; avatar: string }[]
+  >([]);
   const [msg, setMsg] = useState('');
   const [loaded, setLoaded] = useState(false);
 
@@ -973,6 +1207,8 @@ function SettingsPanel() {
         setUrl(site.url);
         setTexts(site.texts ?? {});
         setNotesEnabled(site.texts?.[SITE_TEXT_KEYS.notesEnabled] === '1');
+        setSocials(site.socials ?? []);
+        setLinks((site.links ?? []).map((l) => ({ ...l, description: l.description ?? '', avatar: l.avatar ?? '' })));
       } catch (e) {
         setMsg(e instanceof Error ? e.message : '加载站点设置失败');
       } finally {
@@ -985,6 +1221,10 @@ function SettingsPanel() {
     setTexts((prev) => ({ ...prev, [key]: value }));
   }
 
+  function updateLink(index: number, patch: Partial<(typeof links)[number]>) {
+    setLinks((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  }
+
   async function save() {
     try {
       await adminApi.saveSite({
@@ -992,7 +1232,8 @@ function SettingsPanel() {
         tagline,
         description,
         url,
-        socials: [],
+        socials,
+        links,
         texts: { ...texts, [SITE_TEXT_KEYS.notesEnabled]: notesEnabled ? '1' : '0' },
       });
       setMsg('已保存 ✓');
@@ -1007,7 +1248,7 @@ function SettingsPanel() {
       {msg ? <p className="admin-notice">{msg}</p> : null}
       <p className="admin-hint">
         站点名称、副标题、描述与网址。改动后前台会实时生效（前台强制动态渲染）。
-        首次部署可以从这里开始：先给博客起个名字，再去「关于页面」写自我介绍。
+        首次部署可以从这里开始：先给博客起个名字，再去「页面」写自我介绍。
       </p>
 
       <label className="admin-field">
@@ -1178,7 +1419,65 @@ function SettingsPanel() {
         </label>
       </div>
 
-      <button className="btn btn--primary" onClick={save} disabled={!loaded}>保存设置</button>
+      <h3 className="admin-section-title" style={{ marginTop: 28 }}>友链</h3>
+      <p className="admin-hint">
+        显示在 /links 页面。留空就是空状态——不预置任何别人的站点。只接受 http/https 地址。
+      </p>
+
+      {links.length > 0 ? (
+        <ul className="admin-link-list">
+          {links.map((link, index) => (
+            <li key={index} className="admin-link-row">
+              <input
+                className="admin-input"
+                placeholder="站点名"
+                value={link.name}
+                onChange={(e) => updateLink(index, { name: e.target.value })}
+              />
+              <input
+                className="admin-input"
+                placeholder="https://example.com"
+                value={link.url}
+                onChange={(e) => updateLink(index, { url: e.target.value })}
+              />
+              <input
+                className="admin-input"
+                placeholder="一句话介绍（可选）"
+                value={link.description}
+                onChange={(e) => updateLink(index, { description: e.target.value })}
+              />
+              <input
+                className="admin-input"
+                placeholder="头像 URL（可选）"
+                value={link.avatar}
+                onChange={(e) => updateLink(index, { avatar: e.target.value })}
+              />
+              <button
+                className="admin-post-item__del"
+                title="删除这条友链"
+                onClick={() => setLinks((prev) => prev.filter((_, i) => i !== index))}
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="admin-empty">还没有友链。</p>
+      )}
+
+      <button
+        className="btn btn--ghost"
+        onClick={() =>
+          setLinks((prev) => [...prev, { name: '', url: '', description: '', avatar: '' }])
+        }
+      >
+        + 添加友链
+      </button>
+
+      <button className="btn btn--primary" onClick={save} disabled={!loaded} style={{ marginLeft: 10 }}>
+        保存设置
+      </button>
 
       <BackupPanel />
 

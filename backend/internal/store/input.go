@@ -21,6 +21,7 @@ type TagInput struct {
 }
 
 // PostInput 是文章写入入参。TagIDs 会整体覆盖该文章现有的标签关联。
+// SeriesID 为 nil 表示把文章移出系列；SeriesOrder 是系列内的阅读序号。
 type PostInput struct {
 	Slug           string
 	Title          string
@@ -33,5 +34,14 @@ type PostInput struct {
 	ReadingMinutes int
 	AuthorID       *int64
 	TagIDs         []int64
+	SeriesID       *int64
+	SeriesOrder    int
 	PublishedAt    *time.Time
+}
+
+// SeriesInput 是系列写入入参。
+type SeriesInput struct {
+	Slug        string
+	Title       string
+	Description string
 }

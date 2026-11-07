@@ -56,9 +56,9 @@ func (s *Store) UpsertPost(ctx context.Context, p PostInput) (int64, error) {
 	err = tx.QueryRow(ctx, `
         INSERT INTO posts (
             slug, title, summary, body_md, cover_color, cover_url, status, featured,
-            reading_minutes, author_id, published_at
+            reading_minutes, author_id, series_id, series_order, published_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         ON CONFLICT (slug) DO UPDATE
             SET title           = EXCLUDED.title,
                 summary         = EXCLUDED.summary,
@@ -69,10 +69,12 @@ func (s *Store) UpsertPost(ctx context.Context, p PostInput) (int64, error) {
                 featured        = EXCLUDED.featured,
                 reading_minutes = EXCLUDED.reading_minutes,
                 author_id       = EXCLUDED.author_id,
+                series_id       = EXCLUDED.series_id,
+                series_order    = EXCLUDED.series_order,
                 published_at    = EXCLUDED.published_at
         RETURNING id`,
 		p.Slug, p.Title, p.Summary, p.BodyMD, p.CoverColor, p.CoverURL, p.Status, p.Featured,
-		p.ReadingMinutes, p.AuthorID, p.PublishedAt,
+		p.ReadingMinutes, p.AuthorID, p.SeriesID, p.SeriesOrder, p.PublishedAt,
 	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("写入文章 %q 失败: %w", p.Slug, err)

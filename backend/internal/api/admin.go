@@ -134,16 +134,18 @@ func contextWithAdminUser(r *http.Request, username string) context.Context {
 
 // adminPostInput 是管理后台写文章时的入参。
 type adminPostInput struct {
-	Slug       string  `json:"slug"`
-	Title      string  `json:"title"`
-	Summary    string  `json:"summary"`
-	BodyMD     string  `json:"body_md"`
-	CoverColor string  `json:"cover_color"`
-	CoverURL   string  `json:"cover_url"`
-	Status     string  `json:"status"`
-	Featured   bool    `json:"featured"`
-	TagIDs     []int64 `json:"tag_ids"`
-	Published  *string `json:"published_at"` // RFC3339 字符串，空则用当前时间
+	Slug        string  `json:"slug"`
+	Title       string  `json:"title"`
+	Summary     string  `json:"summary"`
+	BodyMD      string  `json:"body_md"`
+	CoverColor  string  `json:"cover_color"`
+	CoverURL    string  `json:"cover_url"`
+	Status      string  `json:"status"`
+	Featured    bool    `json:"featured"`
+	TagIDs      []int64 `json:"tag_ids"`
+	SeriesID    *int64  `json:"series_id"`    // null 表示不属于任何系列
+	SeriesOrder int     `json:"series_order"` // 系列内阅读序号，0 表示按发布时间
+	Published   *string `json:"published_at"` // RFC3339 字符串，空则用当前时间
 }
 
 func (in *adminPostInput) toStore(authorID *int64) (store.PostInput, error) {
@@ -175,6 +177,12 @@ func (in *adminPostInput) toStore(authorID *int64) (store.PostInput, error) {
 		return store.PostInput{}, errors.New("cover_url 只能是站内路径（/media/...）或 https 链接")
 	}
 
+	// 序号允许为负？不允许。小于 0 一律当「没填」，按发布时间排。
+	seriesOrder := in.SeriesOrder
+	if seriesOrder < 0 {
+		seriesOrder = 0
+	}
+
 	return store.PostInput{
 		Slug:           strings.TrimSpace(in.Slug),
 		Title:          strings.TrimSpace(in.Title),
@@ -187,6 +195,8 @@ func (in *adminPostInput) toStore(authorID *int64) (store.PostInput, error) {
 		ReadingMinutes: markdown.ReadingMinutes(in.BodyMD),
 		AuthorID:       authorID,
 		TagIDs:         in.TagIDs,
+		SeriesID:       in.SeriesID,
+		SeriesOrder:    seriesOrder,
 		PublishedAt:    publishedAt,
 	}, nil
 }
@@ -346,6 +356,70 @@ func (s *Server) handleAdminDeleteTag(w http.ResponseWriter, r *http.Request) {
 	writeData(w, map[string]any{"deleted": true}, nil)
 }
 
+// ---------------------------------------------------------------- 系列管理
+
+type adminSeriesInput struct {
+	Slug        string `json:"slug"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+}
+
+// handleAdminListSeries 返回全部系列，含还没有文章的空系列——
+// 站长常常先把合集建好，再一篇篇往里放。
+func (s *Server) handleAdminListSeries(w http.ResponseWriter, r *http.Request) {
+	items, err := s.store.ListSeries(r.Context(), false)
+	if err != nil {
+		s.fail(w, "查询系列失败", err)
+		return
+	}
+	writeData(w, items, nil)
+}
+
+// handleAdminSaveSeries 创建或更新系列。
+// slug 只在创建时生成，之后不跟随标题变化：已经有文章的 URL 指向它了。
+func (s *Server) handleAdminSaveSeries(w http.ResponseWriter, r *http.Request) {
+	var in adminSeriesInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "请求体非法")
+		return
+	}
+	title := strings.TrimSpace(in.Title)
+	if title == "" {
+		writeError(w, http.StatusBadRequest, "bad_request", "系列名不能为空")
+		return
+	}
+	slug := strings.TrimSpace(in.Slug)
+	if slug == "" {
+		slug = tagSlug(title)
+	}
+
+	id, err := s.store.UpsertSeries(r.Context(), store.SeriesInput{
+		Slug:        slug,
+		Title:       title,
+		Description: strings.TrimSpace(in.Description),
+	})
+	if err != nil {
+		s.fail(w, "保存系列失败", err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeData(w, map[string]any{"id": id, "slug": slug}, nil)
+}
+
+// handleAdminDeleteSeries 删除系列。成员文章不会被删，只是解除归属。
+func (s *Server) handleAdminDeleteSeries(w http.ResponseWriter, r *http.Request) {
+	if err := s.store.DeleteSeries(r.Context(), r.PathValue("slug")); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not_found", "系列不存在")
+			return
+		}
+		s.fail(w, "删除系列失败", err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeData(w, map[string]any{"deleted": true}, nil)
+}
+
 // ---------------------------------------------------------------- 页面管理
 
 type adminPageInput struct {
@@ -392,12 +466,13 @@ func (s *Server) handleAdminDeletePage(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------- 站点设置
 
 type adminSiteInput struct {
-	Name        string            `json:"name"`
-	Tagline     string            `json:"tagline"`
-	Description string            `json:"description"`
-	URL         string            `json:"url"`
-	Socials     []domain.Social   `json:"socials"`
-	Texts       map[string]string `json:"texts"`
+	Name        string              `json:"name"`
+	Tagline     string              `json:"tagline"`
+	Description string              `json:"description"`
+	URL         string              `json:"url"`
+	Socials     []domain.Social     `json:"socials"`
+	Links       []domain.FriendLink `json:"links"`
+	Texts       map[string]string   `json:"texts"`
 }
 
 // handleAdminSaveSite 更新站点级设置。
@@ -417,6 +492,7 @@ func (s *Server) handleAdminSaveSite(w http.ResponseWriter, r *http.Request) {
 		"description": strings.TrimSpace(in.Description),
 		"url":         strings.TrimSpace(in.URL),
 		"socials":     socials,
+		"links":       sanitizeLinks(in.Links),
 		"texts":       sanitizeTexts(in.Texts),
 	}); err != nil {
 		s.fail(w, "保存站点设置失败", err)
@@ -466,7 +542,46 @@ func sanitizeTexts(in map[string]string) map[string]string {
 const (
 	maxSiteTexts   = 64
 	maxSiteTextLen = 500
+
+	maxFriendLinks   = 50
+	maxFriendLinkLen = 200
 )
+
+// sanitizeLinks 收敛前台提交的友链。
+//
+// 只放行 http/https 绝对地址：友链是站长手填的，一旦混进 javascript: 或
+// data: 就是存储型 XSS。名称与描述的空白、超长都在这里砍掉，不让脏数据入库。
+func sanitizeLinks(in []domain.FriendLink) []domain.FriendLink {
+	out := make([]domain.FriendLink, 0, len(in))
+	for _, link := range in {
+		if len(out) >= maxFriendLinks {
+			break
+		}
+		name := strings.TrimSpace(link.Name)
+		url := strings.TrimSpace(link.URL)
+		if name == "" || url == "" {
+			continue
+		}
+		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+			continue
+		}
+		out = append(out, domain.FriendLink{
+			Name:        truncateRunes(name, maxFriendLinkLen),
+			URL:         truncateRunes(url, maxFriendLinkLen),
+			Description: truncateRunes(strings.TrimSpace(link.Description), maxFriendLinkLen),
+			Avatar:      strings.TrimSpace(link.Avatar),
+		})
+	}
+	return out
+}
+
+func truncateRunes(s string, max int) string {
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	return string(runes[:max])
+}
 
 // maxSlugLen 是自动生成 slug 的最大长度（字符数）。
 const maxSlugLen = 60

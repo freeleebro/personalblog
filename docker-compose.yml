@@ -25,6 +25,11 @@ services:
       HOSTNAME: 0.0.0.0
       PGDATA: /var/lib/postgresql/data
       UPLOAD_DIR: /data/uploads
+      # 宿主机只有 2GB。不限制的话容器能吃掉整机，Next 或 PG 一抖动
+      # 就会把宿主拖进 OOM。实测稳态 107MB、峰值 185MB，640m 留足余量。
+      NODE_OPTIONS: '--max-old-space-size=256'
+    mem_limit: 640m
+    memswap_limit: 1g
     ports:
       # 仅本机可访问，用于排障；公网入口是 caddy
       - '127.0.0.1:5000:3000'

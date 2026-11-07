@@ -37,9 +37,32 @@ type Post struct {
 	Views          int        `json:"views"`
 	Author         *Author    `json:"author,omitempty"`
 	Tags           []Tag      `json:"tags"`
+	Series         *SeriesRef `json:"series,omitempty"`
+	SeriesOrder    int        `json:"series_order"`
 	PublishedAt    *time.Time `json:"published_at"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+// SeriesRef 是挂在文章上的系列摘要，只够渲染「本文属于哪个系列、是第几篇」。
+// 完整的系列详情（简介、成员列表）走 /api/v1/series/{slug}。
+type SeriesRef struct {
+	ID    int64  `json:"id"`
+	Slug  string `json:"slug"`
+	Title string `json:"title"`
+}
+
+// Series 是系列 / 合集：一组有固定阅读顺序的文章。
+// PostCount 只在列表与详情里填充，Posts 只在详情接口返回。
+type Series struct {
+	ID          int64     `json:"id"`
+	Slug        string    `json:"slug"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	PostCount   int       `json:"post_count"`
+	Posts       []Post    `json:"posts,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // Page 是独立页面，例如「关于」。
@@ -64,14 +87,26 @@ type Social struct {
 	URL   string `json:"url"`
 }
 
+// FriendLink 是友情链接。
+//
+// 与 Social 分开：Social 是站长自己的账号（GitHub、邮箱），FriendLink 是别人的站，
+// 通常还带一句话介绍和头像。站长没填时是空数组，友链页显示空状态。
+type FriendLink struct {
+	Name        string `json:"name"`
+	URL         string `json:"url"`
+	Description string `json:"description,omitempty"`
+	Avatar      string `json:"avatar,omitempty"`
+}
+
 // Site 是前端首屏需要的全部站点级信息，一次请求取回。
 type Site struct {
-	Name        string   `json:"name"`
-	Tagline     string   `json:"tagline"`
-	Description string   `json:"description"`
-	URL         string   `json:"url"`
-	Author      *Author  `json:"author"`
-	Socials     []Social `json:"socials"`
+	Name        string       `json:"name"`
+	Tagline     string       `json:"tagline"`
+	Description string       `json:"description"`
+	URL         string       `json:"url"`
+	Author      *Author      `json:"author"`
+	Socials     []Social     `json:"socials"`
+	Links       []FriendLink `json:"links"`
 	// Texts 是后台可编辑的短文案（首页大图标题、图集标题等）。
 	Texts    map[string]string `json:"texts"`
 	Stats    Stats             `json:"stats"`

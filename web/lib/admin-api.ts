@@ -3,7 +3,7 @@
 // 管理后台的 API 客户端。所有写操作都带 Bearer token。
 // token 存在 localStorage，由调用方（登录后）注入。
 
-import type { Comment, CommentCounts, Page, Post, Site, StatsSummary, Tag } from './types';
+import type { Comment, CommentCounts, Page, Post, Series, Site, StatsSummary, Tag } from './types';
 
 // 管理后台走同源代理 /api-proxy，避免跨域，也不把后端地址暴露给浏览器。
 const ADMIN_BASE = '/api-proxy';
@@ -103,6 +103,8 @@ export const adminApi = {
     status: string;
     featured: boolean;
     tag_ids: number[];
+    series_id?: number | null;
+    series_order?: number;
     published_at?: string | null;
   }) =>
     adminRequest<{ id: number; slug: string }>('/admin/posts', {
@@ -212,6 +214,18 @@ export const adminApi = {
       method: 'DELETE',
     }),
 
+  /** 系列：后台要看到全部，包括还没有文章的空系列。 */
+  listSeries: () => adminRequest<Series[]>('/admin/series'),
+  saveSeries: (series: { slug: string; title: string; description: string }) =>
+    adminRequest<{ id: number; slug: string }>('/admin/series', {
+      method: 'POST',
+      body: JSON.stringify(series),
+    }),
+  deleteSeries: (slug: string) =>
+    adminRequest<{ deleted: boolean }>(`/admin/series/${encodeURIComponent(slug)}`, {
+      method: 'DELETE',
+    }),
+
   getPage: (slug: string) => adminRequest<Page>(`/pages/${encodeURIComponent(slug)}`),
   savePage: (page: { slug: string; title: string; body_md: string }) =>
     adminRequest<{ slug: string }>('/admin/pages', {
@@ -230,6 +244,7 @@ export const adminApi = {
     description: string;
     url: string;
     socials: { label: string; url: string }[];
+    links: { name: string; url: string; description: string; avatar: string }[];
     texts?: Record<string, string>;
   }) =>
     adminRequest<{ saved: boolean }>('/admin/site', {

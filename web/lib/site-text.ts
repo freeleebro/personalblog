@@ -32,6 +32,10 @@ export const SITE_TEXT_KEYS = {
   tagsTitle: 'tags.title',
   /** 标签页标题下的一句话，留空则显示「N 个标签，共 M 次引用」 */
   tagsLead: 'tags.lead',
+  /** 系列页大标题 */
+  seriesTitle: 'series.title',
+  /** 系列页标题下的一句话 */
+  seriesLead: 'series.lead',
   /** 搜索页大标题 */
   searchTitle: 'search.title',
   /** 搜索框为空时的提示语 */
@@ -54,6 +58,8 @@ export const SITE_TEXT_DEFAULTS: Record<string, string> = {
   [SITE_TEXT_KEYS.archiveLead]: '按年份浏览全部文章。',
   [SITE_TEXT_KEYS.tagsTitle]: '标签',
   [SITE_TEXT_KEYS.tagsLead]: '',
+  [SITE_TEXT_KEYS.seriesTitle]: '系列',
+  [SITE_TEXT_KEYS.seriesLead]: '把长文拆成一组，按顺序从头读到尾。',
   [SITE_TEXT_KEYS.searchTitle]: '搜索',
   [SITE_TEXT_KEYS.searchLead]: '输入关键词，在标题、摘要与正文中查找。',
   [SITE_TEXT_KEYS.notFoundTitle]: '这一页不在了',
